@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::fs::{self, File};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -11,7 +11,7 @@ use slint::{ModelRc, SharedString, VecModel};
 
 slint::include_modules!();
 
-const USAGE: &str = "Usage:\n  lingoes-desktop import <dictionary.db> <entries.tsv>\n  lingoes-desktop lookup <dictionary.db> <query>\n  lingoes-desktop              Launch the graphical application";
+const USAGE: &str = "Usage:\n  lingoes-desktop import <dictionary.db> <dictionary.tsv|dictionary.ifo|dictionary.mdx>\n  lingoes-desktop lookup <dictionary.db> <query>\n  lingoes-desktop full-text <dictionary.db> <query>\n  lingoes-desktop              Launch the graphical application";
 const SEARCH_LIMIT: usize = 100;
 
 #[derive(Debug)]
@@ -56,6 +56,14 @@ impl DesktopApp {
     }
 
     pub fn search(&mut self, query: &str) {
+        self.search_with_mode(query, false);
+    }
+
+    pub fn search_full_text(&mut self, query: &str) {
+        self.search_with_mode(query, true);
+    }
+
+    fn search_with_mode(&mut self, query: &str, full_text: bool) {
         let Ok(query) = LookupQuery::new(query) else {
             self.results.clear();
             self.selected_index = None;
@@ -63,7 +71,12 @@ impl DesktopApp {
             self.has_error = false;
             return;
         };
-        match self.dictionary.lookup_prefix(&query, SEARCH_LIMIT) {
+        let result = if full_text {
+            self.dictionary.lookup_full_text(&query, SEARCH_LIMIT)
+        } else {
+            self.dictionary.lookup_prefix(&query, SEARCH_LIMIT)
+        };
+        match result {
             Ok(results) => {
                 self.results = results;
                 self.selected_index = (!self.results.is_empty()).then_some(0);
@@ -81,18 +94,19 @@ impl DesktopApp {
     pub fn import_path(&mut self, source_path: impl AsRef<Path>) -> Result<(), AppError> {
         let source_path = source_path.as_ref();
         let result: Result<(), AppError> = (|| {
-            let source = File::open(source_path).map_err(|error| {
-                AppError(format!("cannot open {}: {error}", source_path.display()))
-            })?;
             let report = self
                 .dictionary
-                .import_tsv(source)
+                .import_path(source_path)
                 .map_err(|error| AppError(error.to_string()))?;
-            self.status = if report.imported == 1 {
-                "Imported 1 entry".into()
+            let entry_text = if report.imported == 1 {
+                "entry"
             } else {
-                format!("Imported {} entries", report.imported)
+                "entries"
             };
+            self.status = format!(
+                "Imported {} {} ({} new, {} updated)",
+                report.imported, entry_text, report.inserted, report.updated
+            );
             self.has_error = false;
             Ok(())
         })();
@@ -174,6 +188,16 @@ pub fn launch_gui() -> Result<(), AppError> {
     {
         let application = Rc::clone(&application);
         let window_weak = window.as_weak();
+        window.on_full_text_search(move |query| {
+            application.borrow_mut().search_full_text(query.as_str());
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &application.borrow());
+            }
+        });
+    }
+    {
+        let application = Rc::clone(&application);
+        let window_weak = window.as_weak();
         window.on_select_result(move |index| {
             if index >= 0 {
                 application.borrow_mut().select(index as usize);
@@ -191,7 +215,7 @@ pub fn launch_gui() -> Result<(), AppError> {
             if path.is_empty() {
                 application
                     .borrow_mut()
-                    .set_error("Choose or enter a TSV file path");
+                    .set_error("Choose or enter a TSV, StarDict, or MDict file path");
             } else {
                 let _ = application.borrow_mut().import_path(path);
             }
@@ -230,22 +254,31 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<String, AppErr
     let arguments: Vec<_> = arguments.into_iter().collect();
     match arguments.as_slice() {
         [command, database_path, source_path] if command == "import" => {
-            let source = File::open(source_path)
-                .map_err(|error| AppError(format!("cannot open {source_path}: {error}")))?;
             let mut dictionary = SqliteDictionary::open(database_path)
                 .map_err(|error| AppError(error.to_string()))?;
             let report = dictionary
-                .import_tsv(source)
+                .import_path(source_path)
                 .map_err(|error| AppError(error.to_string()))?;
-            Ok(format!("Imported {} entries", report.imported))
+            let entry_text = if report.imported == 1 {
+                "entry"
+            } else {
+                "entries"
+            };
+            Ok(format!(
+                "Imported {} {} ({} new, {} updated)",
+                report.imported, entry_text, report.inserted, report.updated
+            ))
         }
-        [command, database_path, query] if command == "lookup" => {
+        [command, database_path, query] if command == "lookup" || command == "full-text" => {
             let dictionary = SqliteDictionary::open(database_path)
                 .map_err(|error| AppError(error.to_string()))?;
             let query = LookupQuery::new(query).map_err(|_| AppError("query is empty".into()))?;
-            let entries = dictionary
-                .lookup_prefix(&query, 20)
-                .map_err(|error| AppError(error.to_string()))?;
+            let entries = if command == "full-text" {
+                dictionary.lookup_full_text(&query, 20)
+            } else {
+                dictionary.lookup_prefix(&query, 20)
+            }
+            .map_err(|error| AppError(error.to_string()))?;
             if entries.is_empty() {
                 return Ok("No results".into());
             }
@@ -346,6 +379,47 @@ mod tests {
     }
 
     #[test]
+    fn full_text_search_finds_words_in_definitions() {
+        let database_path = temporary_path("fts-app", "db");
+        let source_path = temporary_path("fts-app", "tsv");
+        std::fs::write(&source_path, "tiếng việt\tNgôn ngữ Việt Nam\n").unwrap();
+        let mut application = DesktopApp::open(&database_path).unwrap();
+        application.import_path(&source_path).unwrap();
+
+        application.search_full_text("Việt Nam");
+
+        assert_eq!(application.results().len(), 1);
+        assert_eq!(application.selected_headword(), "tiếng việt");
+        assert_eq!(application.status(), "1 result");
+        let _ = std::fs::remove_file(database_path);
+        let _ = std::fs::remove_file(source_path);
+    }
+
+    #[test]
+    fn cli_full_text_command_works() {
+        let database_path = temporary_path("cli-fts", "db");
+        let source_path = temporary_path("cli-fts", "tsv");
+        std::fs::write(&source_path, "rust\ta systems language\n").unwrap();
+        let import_output = run([
+            "import".into(),
+            database_path.to_str().unwrap().into(),
+            source_path.to_str().unwrap().into(),
+        ])
+        .unwrap();
+        assert!(import_output.contains("Imported 1 entry"));
+
+        let lookup_output = run([
+            "full-text".into(),
+            database_path.to_str().unwrap().into(),
+            "language".into(),
+        ])
+        .unwrap();
+        assert_eq!(lookup_output, "rust\ta systems language");
+        let _ = std::fs::remove_file(database_path);
+        let _ = std::fs::remove_file(source_path);
+    }
+
+    #[test]
     fn importing_a_tsv_reports_success_and_malformed_input_reports_an_error() {
         let database_path = temporary_path("import", "db");
         let valid_path = temporary_path("valid", "tsv");
@@ -355,7 +429,7 @@ mod tests {
         let mut application = DesktopApp::open(&database_path).unwrap();
 
         application.import_path(&valid_path).unwrap();
-        assert_eq!(application.status(), "Imported 1 entry");
+        assert_eq!(application.status(), "Imported 1 entry (1 new, 0 updated)");
         assert!(!application.has_error());
 
         assert!(application.import_path(&invalid_path).is_err());

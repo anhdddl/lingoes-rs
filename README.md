@@ -12,13 +12,21 @@ A clean-room, Rust-only dictionary and translation desktop application inspired 
 
 ## Current milestone
 
-Milestone 1 provides a native Slint desktop interface backed by the SQLite dictionary core. It includes live prefix search, a result/detail view, TSV import by path, visible status/error feedback, and a portable database stored at `data/lingoes.db` beside the executable.
+Milestone 2 provides a production dictionary engine and multi-format import pipeline:
+- **Unicode-friendly Search**: NFC normalization and lowercase folding for exact match, scalable indexed prefix lookup, and full-text search (SQLite FTS5 with BM25 ranking).
+- **Supported Formats**:
+  - UTF-8 TSV (`headword<TAB>definition`).
+  - StarDict (`.ifo`, `.idx`, `.dict`, and compressed `.dict.dz`).
+  - MDict MDX v2.0 (pure-Rust via `opendict-rs`).
+- **Atomic Bulk Import**: Transaction-based imports roll back completely on malformed entries or I/O errors.
+- **Reporting & Statistics**: Import operations report imported count, newly inserted entries, and updated entries.
+- **Desktop GUI & CLI**: Slint GUI exposes both prefix and full-text search, multi-format import auto-detection, and status reporting.
 
 ## Workspace
 
-- `crates/lingoes-core`: domain types and search contracts.
-- `crates/lingoes-dictionary`: dictionary storage and importers.
-- `apps/lingoes-desktop`: desktop executable.
+- `crates/lingoes-core`: domain types, unicode normalization, and search contracts.
+- `crates/lingoes-dictionary`: dictionary storage, FTS5 indexes, and multi-format importers.
+- `apps/lingoes-desktop`: desktop executable and Slint UI.
 - `docs/plans`: implementation plans and milestones.
 
 ## Development
@@ -29,11 +37,14 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo run -p lingoes-desktop
 ```
 
-Running without arguments opens the GUI. The search field has initial keyboard focus and searches as you type; Enter also submits search and import paths. Import files are UTF-8 TSV rows in the form `headword<TAB>definition`; blank lines and `#` comments are ignored.
+Running without arguments opens the GUI. The search field has initial keyboard focus and searches as you type; Enter also submits search and import paths. Use the **Full text** button for content searches across definitions.
 
-The existing automation interface remains available:
+The automation interface:
 
 ```bash
-cargo run -p lingoes-desktop -- import path/to/dictionary.db entries.tsv
+cargo run -p lingoes-desktop -- import path/to/dictionary.db dictionary.tsv
+cargo run -p lingoes-desktop -- import path/to/dictionary.db dictionary.ifo
+cargo run -p lingoes-desktop -- import path/to/dictionary.db dictionary.mdx
 cargo run -p lingoes-desktop -- lookup path/to/dictionary.db query
+cargo run -p lingoes-desktop -- full-text path/to/dictionary.db query
 ```

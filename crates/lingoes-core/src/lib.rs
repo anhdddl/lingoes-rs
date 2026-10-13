@@ -1,3 +1,5 @@
+use unicode_normalization::UnicodeNormalization;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DictionaryEntry {
     headword: String,
@@ -23,7 +25,7 @@ impl DictionaryEntry {
         }
         Ok(Self {
             headword: headword.to_owned(),
-            normalized_headword: headword.to_lowercase(),
+            normalized_headword: normalize_search_text(headword),
             definition: definition.to_owned(),
         })
     }
@@ -49,13 +51,17 @@ pub enum QueryError {
     Empty,
 }
 
+pub fn normalize_search_text(value: &str) -> String {
+    value.nfc().flat_map(char::to_lowercase).nfc().collect()
+}
+
 impl LookupQuery {
     pub fn new(query: impl AsRef<str>) -> Result<Self, QueryError> {
         let query = query.as_ref().trim();
         if query.is_empty() {
             return Err(QueryError::Empty);
         }
-        Ok(Self(query.to_lowercase()))
+        Ok(Self(normalize_search_text(query)))
     }
 
     pub fn as_str(&self) -> &str {
@@ -96,5 +102,18 @@ mod tests {
     #[test]
     fn query_rejects_blank_input() {
         assert_eq!(LookupQuery::new("\t ").unwrap_err(), QueryError::Empty);
+    }
+
+    #[test]
+    fn normalization_canonicalizes_unicode_and_case() {
+        let composed = DictionaryEntry::new("TIẾNG VIỆT", "language").unwrap();
+        let decomposed = LookupQuery::new("tie\u{302}\u{301}ng vie\u{323}\u{302}t").unwrap();
+        assert_eq!(composed.normalized_headword(), decomposed.as_str());
+    }
+
+    #[test]
+    fn normalization_handles_unicode_case_expansion() {
+        let entry = DictionaryEntry::new("İstanbul", "city").unwrap();
+        assert_eq!(entry.normalized_headword(), "i\u{307}stanbul");
     }
 }

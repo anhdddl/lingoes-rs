@@ -22,6 +22,7 @@ export component AppWindow inherits Window {
     in property <bool> status-is-error: false;
 
     callback search(string);
+    callback full-text-search(string);
     callback select-result(int);
     callback import-dictionary(string);
 
@@ -50,17 +51,21 @@ export component AppWindow inherits Window {
                 text: "Search";
                 clicked => { root.search(root.query); }
             }
+            Button {
+                text: "Full text";
+                clicked => { root.full-text-search(root.query); }
+            }
         }
 
         HorizontalBox {
             spacing: 8px;
             LineEdit {
                 text <=> root.import-path;
-                placeholder-text: "Path to a UTF-8 TSV dictionary";
+                placeholder-text: "Path to TSV, StarDict (.ifo), or MDict (.mdx)";
                 accepted => { root.import-dictionary(self.text); }
             }
             Button {
-                text: "Import TSV";
+                text: "Import dictionary";
                 clicked => { root.import-dictionary(root.import-path); }
             }
         }

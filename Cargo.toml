@@ -16,3 +16,4 @@ rust-version = "1.85"
 lingoes-core = { path = "crates/lingoes-core" }
 lingoes-dictionary = { path = "crates/lingoes-dictionary" }
 thiserror = "2"
+unicode-normalization = "0.1"
