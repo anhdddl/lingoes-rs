@@ -1,0 +1,130 @@
+import { Button, LineEdit, ListView, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+export struct SearchResult {
+    headword: string,
+    definition: string,
+}
+
+export component AppWindow inherits Window {
+    title: "Lingoes RS";
+    preferred-width: 900px;
+    preferred-height: 600px;
+    min-width: 640px;
+    min-height: 420px;
+
+    in-out property <string> query;
+    in-out property <string> import-path;
+    in property <[SearchResult]> results;
+    in property <int> selected-index: -1;
+    in property <string> selected-headword;
+    in property <string> selected-definition;
+    in property <string> status-text: "Type a word to search";
+    in property <bool> status-is-error: false;
+
+    callback search(string);
+    callback select-result(int);
+    callback import-dictionary(string);
+
+    forward-focus: search-input;
+
+    VerticalBox {
+        padding: 18px;
+        spacing: 12px;
+
+        Text {
+            text: "Lingoes RS";
+            font-size: 26px;
+            font-weight: 700;
+            color: #16324f;
+        }
+
+        HorizontalBox {
+            spacing: 8px;
+            search-input := LineEdit {
+                text <=> root.query;
+                placeholder-text: "Search the dictionary…";
+                accepted => { root.search(self.text); }
+                edited => { root.search(self.text); }
+            }
+            Button {
+                text: "Search";
+                clicked => { root.search(root.query); }
+            }
+        }
+
+        HorizontalBox {
+            spacing: 8px;
+            LineEdit {
+                text <=> root.import-path;
+                placeholder-text: "Path to a UTF-8 TSV dictionary";
+                accepted => { root.import-dictionary(self.text); }
+            }
+            Button {
+                text: "Import TSV";
+                clicked => { root.import-dictionary(root.import-path); }
+            }
+        }
+
+        HorizontalBox {
+            spacing: 16px;
+            VerticalBox {
+                preferred-width: 300px;
+                Text { text: "Matches"; font-weight: 600; color: #334e68; }
+                ListView {
+                    for result[index] in root.results : Rectangle {
+                        height: 44px;
+                        background: index == root.selected-index ? #d9eaf7 : #ffffff;
+                        border-color: #d9e2ec;
+                        border-width: 1px;
+                        Text {
+                            x: 10px;
+                            width: parent.width - 20px;
+                            vertical-alignment: center;
+                            text: result.headword;
+                            color: #102a43;
+                            overflow: elide;
+                        }
+                        TouchArea { clicked => { root.select-result(index); } }
+                    }
+                }
+            }
+
+            Rectangle {
+                border-color: #bcccdc;
+                border-width: 1px;
+                border-radius: 6px;
+                background: #f8fafc;
+                VerticalBox {
+                    padding: 18px;
+                    spacing: 10px;
+                    Text {
+                        text: root.selected-headword == "" ? "Select a result" : root.selected-headword;
+                        font-size: 22px;
+                        font-weight: 700;
+                        color: #16324f;
+                    }
+                    Text {
+                        text: root.selected-definition;
+                        wrap: word-wrap;
+                        vertical-stretch: 1;
+                        color: #243b53;
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            height: 34px;
+            border-radius: 4px;
+            background: root.status-is-error ? #fff0f0 : #edf6ff;
+            Text {
+                x: 10px;
+                width: parent.width - 20px;
+                vertical-alignment: center;
+                text: root.status-text;
+                color: root.status-is-error ? #b42318 : #155b8a;
+                overflow: elide;
+            }
+        }
+    }
+}

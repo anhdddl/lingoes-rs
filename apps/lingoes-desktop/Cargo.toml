@@ -8,3 +8,11 @@ rust-version.workspace = true
 [dependencies]
 lingoes-core.workspace = true
 lingoes-dictionary.workspace = true
+slint = { version = "=1.8.0", default-features = false, features = [
+    "backend-winit",
+    "compat-1-2",
+    "renderer-femtovg",
+] }
+
+[build-dependencies]
+slint-build = "=1.8.0"
