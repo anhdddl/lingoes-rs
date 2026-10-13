@@ -1,0 +1,10 @@
+[package]
+name = "lingoes-tts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+lingoes-core.workspace = true
+thiserror.workspace = true

@@ -5,6 +5,8 @@ pub struct DictionaryEntry {
     headword: String,
     normalized_headword: String,
     definition: String,
+    dictionary_id: Option<i64>,
+    dictionary_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,7 +29,26 @@ impl DictionaryEntry {
             headword: headword.to_owned(),
             normalized_headword: normalize_search_text(headword),
             definition: definition.to_owned(),
+            dictionary_id: None,
+            dictionary_name: None,
         })
+    }
+
+    pub fn with_dictionary(
+        headword: impl AsRef<str>,
+        definition: impl AsRef<str>,
+        dictionary_id: i64,
+        dictionary_name: impl Into<String>,
+    ) -> Result<Self, EntryError> {
+        let mut entry = Self::new(headword, definition)?;
+        entry.dictionary_id = Some(dictionary_id);
+        entry.dictionary_name = Some(dictionary_name.into());
+        Ok(entry)
+    }
+
+    pub fn set_dictionary(&mut self, dictionary_id: i64, dictionary_name: impl Into<String>) {
+        self.dictionary_id = Some(dictionary_id);
+        self.dictionary_name = Some(dictionary_name.into());
     }
 
     pub fn headword(&self) -> &str {
@@ -40,6 +61,14 @@ impl DictionaryEntry {
 
     pub fn definition(&self) -> &str {
         &self.definition
+    }
+
+    pub fn dictionary_id(&self) -> Option<i64> {
+        self.dictionary_id
+    }
+
+    pub fn dictionary_name(&self) -> Option<&str> {
+        self.dictionary_name.as_deref()
     }
 }
 
@@ -115,5 +144,22 @@ mod tests {
     fn normalization_handles_unicode_case_expansion() {
         let entry = DictionaryEntry::new("İstanbul", "city").unwrap();
         assert_eq!(entry.normalized_headword(), "i\u{307}stanbul");
+    }
+
+    #[test]
+    fn entry_supports_dictionary_attribution() {
+        let entry = DictionaryEntry::with_dictionary("hello", "greeting", 42, "Oxford").unwrap();
+        assert_eq!(entry.headword(), "hello");
+        assert_eq!(entry.definition(), "greeting");
+        assert_eq!(entry.dictionary_id(), Some(42));
+        assert_eq!(entry.dictionary_name(), Some("Oxford"));
+
+        let mut default_entry = DictionaryEntry::new("world", "earth").unwrap();
+        assert_eq!(default_entry.dictionary_id(), None);
+        assert_eq!(default_entry.dictionary_name(), None);
+
+        default_entry.set_dictionary(7, "Cambridge");
+        assert_eq!(default_entry.dictionary_id(), Some(7));
+        assert_eq!(default_entry.dictionary_name(), Some("Cambridge"));
     }
 }
