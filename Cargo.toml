@@ -1,0 +1,18 @@
+[workspace]
+members = [
+    "apps/lingoes-desktop",
+    "crates/lingoes-core",
+    "crates/lingoes-dictionary",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+rust-version = "1.85"
+
+[workspace.dependencies]
+lingoes-core = { path = "crates/lingoes-core" }
+lingoes-dictionary = { path = "crates/lingoes-dictionary" }
+thiserror = "2"
