@@ -6,6 +6,7 @@ members = [
     "crates/lingoes-dictionary",
     "crates/lingoes-translator",
     "crates/lingoes-tts",
+    "xtask",
 ]
 resolver = "2"
 

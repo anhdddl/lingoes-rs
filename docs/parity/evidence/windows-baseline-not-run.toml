@@ -1,0 +1,651 @@
+schema_version = 1
+generated_for = "Milestone 0 baseline"
+note = "No Windows scenarios were executed on the Linux development host."
+
+[[scenarios]]
+id = "WIN-UI-01"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-02"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-03"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-04"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-05"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-06"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-07"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-08"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-09"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-10"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-11"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-12"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-13"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-14"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-UI-15"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-01"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-02"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-03"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-04"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-05"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-06"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-07"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-08"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-09"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-10"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-11"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-12"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-13"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-14"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-15"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-16"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-17"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-DICT-18"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-CAP-01"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-CAP-02"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-CAP-03"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-CAP-04"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-CAP-05"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-CAP-06"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-CAP-07"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-CAP-08"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-CAP-09"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-CAP-10"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TR-01"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TR-02"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TR-03"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TR-04"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TR-05"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TR-06"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TR-07"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TR-08"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TR-09"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TR-10"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TTS-01"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TTS-02"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TTS-03"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TTS-04"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TTS-05"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-TTS-06"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-HIST-01"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-HIST-02"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-HIST-03"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-HIST-04"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-HIST-05"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-IO-01"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-IO-02"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-IO-03"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-IO-04"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-IO-05"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-SET-01"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-SET-02"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-SET-03"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-SET-04"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-SET-05"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-SET-06"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-SET-07"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-SET-08"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-SET-09"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-SET-10"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-01"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-02"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-03"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-04"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-05"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-06"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-07"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-08"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-09"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-10"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-11"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-12"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-13"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-APPX-14"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-PKG-01"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-PKG-02"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-PKG-03"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-PKG-04"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-PKG-05"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-PLUG-01"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-PLUG-02"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-PLUG-03"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-PLUG-04"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-PLUG-05"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-PLUG-06"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-VER-01"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-VER-02"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-VER-03"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."
+
+[[scenarios]]
+id = "WIN-VER-04"
+platform = "windows"
+status = "NOT RUN"
+evidence = "No runtime artifact is available."

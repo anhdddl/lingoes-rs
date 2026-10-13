@@ -1,0 +1,20 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+sha2 = "0.10"
+toml = "0.8"
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile = "3"
+
+[[test]]
+name = "parity_validator"
+path = "tests/parity_validator.rs"

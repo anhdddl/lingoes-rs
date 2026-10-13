@@ -1,0 +1,1520 @@
+schema_version = 1
+matrix_source = "docs/audit/parity-gap-matrix.md"
+
+[[artifacts]]
+id = "BASELINE-WINDOWS-NOT-RUN"
+path = "docs/parity/evidence/windows-baseline-not-run.toml"
+sha256 = "b7fd5ce803cf76f0e76adb5ebe6faedacb5aae2ef81dd43809469efa94f7c601"
+kind = "independent-scenario-report"
+
+[[capabilities]]
+id = "UI-01"
+workflow = "Native main window with close/maximize/minimize/restore and main menu"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-01"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["UI-01-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-01"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-01 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-02"
+workflow = "Main menu workflows: open, capture toggles, configuration, dictionaries, appendices, activation, update, help, support, exit"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-02"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["UI-02-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-02"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-02 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-03"
+workflow = "Back/forward navigation and history list in the search view"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-03"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["UI-03-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-03"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-03 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-04"
+workflow = "Sidebar/index with Index, Guide, Appendix; show/hide sidebar"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-04"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["UI-04-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-04"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-04 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-05"
+workflow = "Prefix/index lookup with automatic closest-match suggestions"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-05"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["UI-05-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-05"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-05 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-06"
+workflow = "Detailed explanation search and full-text/find-in-result workflows"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-06"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["UI-06-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-06"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-06 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-07"
+workflow = "Search result list and dictionary result pane"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-07"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["UI-07-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-07"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-07 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-08"
+workflow = "Correct source-dictionary attribution in result presentation"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-08"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["UI-08-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-08"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-08 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-09"
+workflow = "Spelling alternatives/spell checker"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-09"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["UI-09-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-09"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-09 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-10"
+workflow = "Web search from the query workflow with selectable engine"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-10"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["UI-10-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-10"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-10 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-11"
+workflow = "Start page/guide and online support links"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-11"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["UI-11-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-11"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-11 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-12"
+workflow = "Mini window with keep-on-top, keep-size, roll-up, auto-roll-up, back/forward, copy and speech"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-12"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["UI-12-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-12"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-12 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-13"
+workflow = "Text-capture popup/quick result"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-13"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["UI-13-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-13"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-13 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-14"
+workflow = "Keyboard workflow shortcuts in query box (Enter, Ctrl+Enter, Shift+Enter, Alt+Enter)"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-14"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["UI-14-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-14"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-14 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "UI-15"
+workflow = "Vietnamese-only modern tab layout versus localized Lingoes visual structure"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-15"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["UI-15-ACCEPTANCE"]
+windows_scenarios = ["WIN-UI-15"]
+supported_platforms = ["windows"]
+owner = "desktop-shell"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-15 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-01"
+workflow = "Native Lingoes dictionary install formats `.ld2` and `.ldp`"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-01"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["DICT-01-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-01"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-01 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-02"
+workflow = "Import UTF-8 TSV dictionaries"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-02"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["DICT-02-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-02"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-02 before setting verified."
+deviation = "Matrix classifies the baseline workflow as complete; Windows runtime verification remains NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-03"
+workflow = "Import StarDict (`.ifo/.idx/.dict/.dict.dz`)"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-03"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["DICT-03-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-03"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-03 before setting verified."
+deviation = "Matrix classifies the baseline workflow as complete; Windows runtime verification remains NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-04"
+workflow = "Import MDict MDX v2"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-04"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["DICT-04-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-04"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-04 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-05"
+workflow = "Install/download/uninstall dictionaries"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-05"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["DICT-05-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-05"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-05 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-06"
+workflow = "Dictionary metadata/details (title, language, publisher, website, copyright, description)"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-06"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["DICT-06-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-06"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-06 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-07"
+workflow = "Query, Index, and Text Capture dictionary groups"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-07"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["DICT-07-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-07"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-07 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-08"
+workflow = "Reorder dictionaries / set top result / arrange results"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-08"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["DICT-08-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-08"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-08 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-09"
+workflow = "Enable/disable dictionaries"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-09"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["DICT-09-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-09"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-09 before setting verified."
+deviation = "Matrix classifies the baseline workflow as complete; Windows runtime verification remains NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-10"
+workflow = "Exact/prefix and Unicode-normalized local lookup"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-10"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["DICT-10-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-10"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-10 before setting verified."
+deviation = "Matrix classifies the baseline workflow as complete; Windows runtime verification remains NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-11"
+workflow = "Multi-dictionary result aggregation"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-11"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["DICT-11-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-11"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-11 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-12"
+workflow = "Rich HTML dictionary presentation, phonetics, images, links, audio, scripts, and expandable sections"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-12"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["DICT-12-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-12"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-12 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-13"
+workflow = "Online dictionaries and local cache"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-13"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["DICT-13-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-13"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-13 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-14"
+workflow = "Dictionary backup export/import (`.ldb`)"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-14"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["DICT-14-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-14"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-14 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-15"
+workflow = "Dictionary file associations (`.ld2`, `.ldp`, `.laf`) and migration from 2.8"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-15"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["DICT-15-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-15"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-15 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-16"
+workflow = "Bundled Concise English, synonym/antonym, English-German, Jukuu, WordNet, instant/text-translation dictionaries"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-16"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["DICT-16-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-16"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-16 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-17"
+workflow = "Chinese simplified/traditional conversion databases and Unicode data"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-17"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["DICT-17-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-17"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-17 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "DICT-18"
+workflow = "Licensed/trial dictionary activation and purchase state"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-18"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["DICT-18-ACCEPTANCE"]
+windows_scenarios = ["WIN-DICT-18"]
+supported_platforms = ["windows"]
+owner = "dictionary"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-18 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "CAP-01"
+workflow = "Capture the word under the mouse cursor from arbitrary Windows applications"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-01"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["CAP-01-ACCEPTANCE"]
+windows_scenarios = ["WIN-CAP-01"]
+supported_platforms = ["windows"]
+owner = "capture"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-01 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "CAP-02"
+workflow = "Configurable mouse activation buttons and capture delay"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-02"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["CAP-02-ACCEPTANCE"]
+windows_scenarios = ["WIN-CAP-02"]
+supported_platforms = ["windows"]
+owner = "capture"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-02 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "CAP-03"
+workflow = "Phrase matching and script/number ignore filters"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-03"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["CAP-03-ACCEPTANCE"]
+windows_scenarios = ["WIN-CAP-03"]
+supported_platforms = ["windows"]
+owner = "capture"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-03 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "CAP-04"
+workflow = "Translate selected text and double-click selection"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-04"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["CAP-04-ACCEPTANCE"]
+windows_scenarios = ["WIN-CAP-04"]
+supported_platforms = ["windows"]
+owner = "capture"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-04 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "CAP-05"
+workflow = "Per-program/per-window selection filter rules and window-class capture tool"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-05"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["CAP-05-ACCEPTANCE"]
+windows_scenarios = ["WIN-CAP-05"]
+supported_platforms = ["windows"]
+owner = "capture"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-05 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "CAP-06"
+workflow = "Clipboard text translation/lookup"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-06"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["CAP-06-ACCEPTANCE"]
+windows_scenarios = ["WIN-CAP-06"]
+supported_platforms = ["windows"]
+owner = "capture"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-06 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "CAP-07"
+workflow = "Native/global hotkeys for window, capture modes, pronunciation, copy, selected-text speech, stop, mini-window roll-up"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-07"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["CAP-07-ACCEPTANCE"]
+windows_scenarios = ["WIN-CAP-07"]
+supported_platforms = ["windows"]
+owner = "capture"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-07 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "CAP-08"
+workflow = "System tray/notification icon with mode status and commands"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-08"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["CAP-08-ACCEPTANCE"]
+windows_scenarios = ["WIN-CAP-08"]
+supported_platforms = ["windows"]
+owner = "capture"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-08 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "CAP-09"
+workflow = "Capture popup translucency/colors, always-on-top, keep size, auto-roll-up"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-09"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["CAP-09-ACCEPTANCE"]
+windows_scenarios = ["WIN-CAP-09"]
+supported_platforms = ["windows"]
+owner = "capture"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-09 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "CAP-10"
+workflow = "Windows native capture behavior across browsers/PDF/native controls"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-10"]
+evidence_status = "inferred"
+implementation_status = "deferred"
+automated_tests = ["CAP-10-ACCEPTANCE"]
+windows_scenarios = ["WIN-CAP-10"]
+supported_platforms = ["windows"]
+owner = "capture"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-10 before setting verified."
+deviation = "Static evidence cannot establish the reference runtime behavior; requirement remains inferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TR-01"
+workflow = "Dedicated multiline Text Translation window/workflow"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TR-01"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["TR-01-ACCEPTANCE"]
+windows_scenarios = ["WIN-TR-01"]
+supported_platforms = ["windows"]
+owner = "translation"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TR-01 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TR-02"
+workflow = "Source/target language selection and source auto-detection"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TR-02"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["TR-02-ACCEPTANCE"]
+windows_scenarios = ["WIN-TR-02"]
+supported_platforms = ["windows"]
+owner = "translation"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TR-02 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TR-03"
+workflow = "Google online text translation"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TR-03"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["TR-03-ACCEPTANCE"]
+windows_scenarios = ["WIN-TR-03"]
+supported_platforms = ["windows"]
+owner = "translation"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TR-03 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TR-04"
+workflow = "Multiple selectable Lingoes translation engines"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TR-04"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["TR-04-ACCEPTANCE"]
+windows_scenarios = ["WIN-TR-04"]
+supported_platforms = ["windows"]
+owner = "translation"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TR-04 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TR-05"
+workflow = "OpenAI/local-LLM translation"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TR-05"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["TR-05-ACCEPTANCE"]
+windows_scenarios = ["WIN-TR-05"]
+supported_platforms = ["windows"]
+owner = "translation"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TR-05 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TR-06"
+workflow = "Instant translation tied to cursor/selection/clipboard modes"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TR-06"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["TR-06-ACCEPTANCE"]
+windows_scenarios = ["WIN-TR-06"]
+supported_platforms = ["windows"]
+owner = "translation"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TR-06 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TR-07"
+workflow = "Local language mapping and fallback target when source equals target"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TR-07"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["TR-07-ACCEPTANCE"]
+windows_scenarios = ["WIN-TR-07"]
+supported_platforms = ["windows"]
+owner = "translation"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TR-07 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TR-08"
+workflow = "Connection/proxy configuration and authenticated proxy"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TR-08"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["TR-08-ACCEPTANCE"]
+windows_scenarios = ["WIN-TR-08"]
+supported_platforms = ["windows"]
+owner = "translation"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TR-08 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TR-09"
+workflow = "Embedded local API/dictionary server"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TR-09"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["TR-09-ACCEPTANCE"]
+windows_scenarios = ["WIN-TR-09"]
+supported_platforms = ["windows"]
+owner = "translation"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TR-09 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TR-10"
+workflow = "Online update service"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TR-10"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["TR-10-ACCEPTANCE"]
+windows_scenarios = ["WIN-TR-10"]
+supported_platforms = ["windows"]
+owner = "translation"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TR-10 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TTS-01"
+workflow = "Speak selected dictionary result or translated text"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TTS-01"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["TTS-01-ACCEPTANCE"]
+windows_scenarios = ["WIN-TTS-01"]
+supported_platforms = ["windows"]
+owner = "speech"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TTS-01 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TTS-02"
+workflow = "System TTS on Windows/macOS/Linux"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TTS-02"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["TTS-02-ACCEPTANCE"]
+windows_scenarios = ["WIN-TTS-02"]
+supported_platforms = ["windows"]
+owner = "speech"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TTS-02 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TTS-03"
+workflow = "Voice, engine, volume, pitch, speed, and audio-format controls"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TTS-03"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["TTS-03-ACCEPTANCE"]
+windows_scenarios = ["WIN-TTS-03"]
+supported_platforms = ["windows"]
+owner = "speech"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TTS-03 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TTS-04"
+workflow = "Real-time pronunciation during query, cursor capture, and selected-text translation"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TTS-04"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["TTS-04-ACCEPTANCE"]
+windows_scenarios = ["WIN-TTS-04"]
+supported_platforms = ["windows"]
+owner = "speech"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TTS-04 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TTS-05"
+workflow = "Natural Voice packages/index and download"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TTS-05"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["TTS-05-ACCEPTANCE"]
+windows_scenarios = ["WIN-TTS-05"]
+supported_platforms = ["windows"]
+owner = "speech"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TTS-05 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "TTS-06"
+workflow = "Speak selected text and stop speaking via hotkeys"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#TTS-06"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["TTS-06-ACCEPTANCE"]
+windows_scenarios = ["WIN-TTS-06"]
+supported_platforms = ["windows"]
+owner = "speech"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TTS-06 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "HIST-01"
+workflow = "Search history list"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#HIST-01"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["HIST-01-ACCEPTANCE"]
+windows_scenarios = ["WIN-HIST-01"]
+supported_platforms = ["windows"]
+owner = "storage"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for HIST-01 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "HIST-02"
+workflow = "Clear history"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#HIST-02"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["HIST-02-ACCEPTANCE"]
+windows_scenarios = ["WIN-HIST-02"]
+supported_platforms = ["windows"]
+owner = "storage"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for HIST-02 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "HIST-03"
+workflow = "Local online-dictionary result cache and clear-cache action"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#HIST-03"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["HIST-03-ACCEPTANCE"]
+windows_scenarios = ["WIN-HIST-03"]
+supported_platforms = ["windows"]
+owner = "storage"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for HIST-03 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "HIST-04"
+workflow = "Notebook/favorites (\u201cAdd the word to notebook\u201d)"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#HIST-04"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["HIST-04-ACCEPTANCE"]
+windows_scenarios = ["WIN-HIST-04"]
+supported_platforms = ["windows"]
+owner = "storage"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for HIST-04 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "HIST-05"
+workflow = "Persist installed dictionaries and entries"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#HIST-05"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["HIST-05-ACCEPTANCE"]
+windows_scenarios = ["WIN-HIST-05"]
+supported_platforms = ["windows"]
+owner = "storage"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for HIST-05 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "IO-01"
+workflow = "Copy displayed interpretation/translation"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#IO-01"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["IO-01-ACCEPTANCE"]
+windows_scenarios = ["WIN-IO-01"]
+supported_platforms = ["windows"]
+owner = "document"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for IO-01 before setting verified."
+deviation = "Matrix classifies the baseline workflow as complete; Windows runtime verification remains NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "IO-02"
+workflow = "Save search result as HTML"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#IO-02"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["IO-02-ACCEPTANCE"]
+windows_scenarios = ["WIN-IO-02"]
+supported_platforms = ["windows"]
+owner = "document"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for IO-02 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "IO-03"
+workflow = "Print displayed result"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#IO-03"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["IO-03-ACCEPTANCE"]
+windows_scenarios = ["WIN-IO-03"]
+supported_platforms = ["windows"]
+owner = "document"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for IO-03 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "IO-04"
+workflow = "Find and Select All in result content"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#IO-04"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["IO-04-ACCEPTANCE"]
+windows_scenarios = ["WIN-IO-04"]
+supported_platforms = ["windows"]
+owner = "document"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for IO-04 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "IO-05"
+workflow = "Copy/speech/text-translation actions from mini/capture window"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#IO-05"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["IO-05-ACCEPTANCE"]
+windows_scenarios = ["WIN-IO-05"]
+supported_platforms = ["windows"]
+owner = "document"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for IO-05 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "SET-01"
+workflow = "Persistent configuration dialog with General, Appearance, Connection, Speech, Hotkeys, Translation, Licenses, Capture, Other"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#SET-01"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["SET-01-ACCEPTANCE"]
+windows_scenarios = ["WIN-SET-01"]
+supported_platforms = ["windows"]
+owner = "settings"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for SET-01 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "SET-02"
+workflow = "UI localization and runtime language selection"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#SET-02"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["SET-02-ACCEPTANCE"]
+windows_scenarios = ["WIN-SET-02"]
+supported_platforms = ["windows"]
+owner = "settings"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for SET-02 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "SET-03"
+workflow = "Right-to-left UI support"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#SET-03"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["SET-03-ACCEPTANCE"]
+windows_scenarios = ["WIN-SET-03"]
+supported_platforms = ["windows"]
+owner = "settings"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for SET-03 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "SET-04"
+workflow = "Window/result/phonetic fonts and sizes"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#SET-04"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["SET-04-ACCEPTANCE"]
+windows_scenarios = ["WIN-SET-04"]
+supported_platforms = ["windows"]
+owner = "settings"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for SET-04 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "SET-05"
+workflow = "Window style and capture-window colors/translucency"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#SET-05"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["SET-05-ACCEPTANCE"]
+windows_scenarios = ["WIN-SET-05"]
+supported_platforms = ["windows"]
+owner = "settings"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for SET-05 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "SET-06"
+workflow = "Restore main/mini window position, size, sidebar, and last configuration page"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#SET-06"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["SET-06-ACCEPTANCE"]
+windows_scenarios = ["WIN-SET-06"]
+supported_platforms = ["windows"]
+owner = "settings"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for SET-06 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "SET-07"
+workflow = "Run at Windows logon; minimize after startup; hide tip window"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#SET-07"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["SET-07-ACCEPTANCE"]
+windows_scenarios = ["WIN-SET-07"]
+supported_platforms = ["windows"]
+owner = "settings"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for SET-07 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "SET-08"
+workflow = "Desktop shortcut and file-association creation"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#SET-08"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["SET-08-ACCEPTANCE"]
+windows_scenarios = ["WIN-SET-08"]
+supported_platforms = ["windows"]
+owner = "settings"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for SET-08 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "SET-09"
+workflow = "Product activation, registration, license import, commercial/evaluation status"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#SET-09"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["SET-09-ACCEPTANCE"]
+windows_scenarios = ["WIN-SET-09"]
+supported_platforms = ["windows"]
+owner = "settings"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for SET-09 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "SET-10"
+workflow = "Error/status reporting"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#SET-10"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["SET-10-ACCEPTANCE"]
+windows_scenarios = ["WIN-SET-10"]
+supported_platforms = ["windows"]
+owner = "settings"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for SET-10 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-01"
+workflow = "Appendix browser/groups integrated into sidebar"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-01"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-01-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-01"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-01 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-02"
+workflow = "Install/delete/modify/reorder/download `.laf` appendices"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-02"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-02-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-02"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-02 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-03"
+workflow = "Appendix Builder: create HTML project and build package"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-03"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-03-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-03"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-03 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-04"
+workflow = "Currency converter"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-04"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-04-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-04"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-04 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-05"
+workflow = "Weights & measures converter"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-05"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-05-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-05"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-05 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-06"
+workflow = "International dialing codes"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-06"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-06-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-06"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-06 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-07"
+workflow = "Time-zone converter"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-07"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-07-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-07"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-07 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-08"
+workflow = "IPA 2005 chart"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-08"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-08-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-08"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-08 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-09"
+workflow = "Periodic table"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-09"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-09-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-09"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-09 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-10"
+workflow = "Scientific calculator"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-10"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-10-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-10"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-10 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-11"
+workflow = "Simplified/traditional Chinese converter"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-11"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-11-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-11"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-11 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-12"
+workflow = "Number-to-text, Base64, MD5/SHA tools"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-12"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-12-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-12"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-12 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-13"
+workflow = "Dictionary abbreviations and irregular-verbs references"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-13"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["APPX-13-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-13"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-13 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "APPX-14"
+workflow = "HTML/JavaScript appendix execution semantics and `app://` actions"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#APPX-14"]
+evidence_status = "inferred"
+implementation_status = "deferred"
+automated_tests = ["APPX-14-ACCEPTANCE"]
+windows_scenarios = ["WIN-APPX-14"]
+supported_platforms = ["windows"]
+owner = "appendices"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for APPX-14 before setting verified."
+deviation = "Static evidence cannot establish the reference runtime behavior; requirement remains inferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "PKG-01"
+workflow = "Portable mode"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#PKG-01"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["PKG-01-ACCEPTANCE"]
+windows_scenarios = ["WIN-PKG-01"]
+supported_platforms = ["windows"]
+owner = "packaging"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for PKG-01 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "PKG-02"
+workflow = "Self-contained Windows distribution with resources, updater, capture/browser/PDF components"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#PKG-02"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["PKG-02-ACCEPTANCE"]
+windows_scenarios = ["WIN-PKG-02"]
+supported_platforms = ["windows"]
+owner = "packaging"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for PKG-02 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "PKG-03"
+workflow = "Linux and Windows cross-platform GUI design"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#PKG-03"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["PKG-03-ACCEPTANCE"]
+windows_scenarios = ["WIN-PKG-03"]
+supported_platforms = ["windows"]
+owner = "packaging"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for PKG-03 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "PKG-04"
+workflow = "Online updater execution and upgrade lifecycle"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#PKG-04"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["PKG-04-ACCEPTANCE"]
+windows_scenarios = ["WIN-PKG-04"]
+supported_platforms = ["windows"]
+owner = "packaging"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for PKG-04 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "PKG-05"
+workflow = "Exact original binary/runtime behavior"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#PKG-05"]
+evidence_status = "inferred"
+implementation_status = "deferred"
+automated_tests = ["PKG-05-ACCEPTANCE"]
+windows_scenarios = ["WIN-PKG-05"]
+supported_platforms = ["windows"]
+owner = "packaging"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for PKG-05 before setting verified."
+deviation = "Static evidence cannot establish the reference runtime behavior; requirement remains inferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "PLUG-01"
+workflow = "Generic text-capture plug-in installation"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#PLUG-01"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["PLUG-01-ACCEPTANCE"]
+windows_scenarios = ["WIN-PLUG-01"]
+supported_platforms = ["windows"]
+owner = "platform-integrations"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for PLUG-01 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "PLUG-02"
+workflow = "Chrome extension/native-messaging integration"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#PLUG-02"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["PLUG-02-ACCEPTANCE"]
+windows_scenarios = ["WIN-PLUG-02"]
+supported_platforms = ["windows"]
+owner = "platform-integrations"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for PLUG-02 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "PLUG-03"
+workflow = "Firefox plug-in"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#PLUG-03"]
+evidence_status = "inferred"
+implementation_status = "deferred"
+automated_tests = ["PLUG-03-ACCEPTANCE"]
+windows_scenarios = ["WIN-PLUG-03"]
+supported_platforms = ["windows"]
+owner = "platform-integrations"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for PLUG-03 before setting verified."
+deviation = "Static evidence cannot establish the reference runtime behavior; requirement remains inferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "PLUG-04"
+workflow = "360 Chrome plug-in"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#PLUG-04"]
+evidence_status = "inferred"
+implementation_status = "deferred"
+automated_tests = ["PLUG-04-ACCEPTANCE"]
+windows_scenarios = ["WIN-PLUG-04"]
+supported_platforms = ["windows"]
+owner = "platform-integrations"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for PLUG-04 before setting verified."
+deviation = "Static evidence cannot establish the reference runtime behavior; requirement remains inferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "PLUG-05"
+workflow = "Adobe Acrobat/PDF capture plug-in"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#PLUG-05"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["PLUG-05-ACCEPTANCE"]
+windows_scenarios = ["WIN-PLUG-05"]
+supported_platforms = ["windows"]
+owner = "platform-integrations"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for PLUG-05 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "PLUG-06"
+workflow = "Browser/PDF text capture parity on Windows"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#PLUG-06"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["PLUG-06-ACCEPTANCE"]
+windows_scenarios = ["WIN-PLUG-06"]
+supported_platforms = ["windows"]
+owner = "platform-integrations"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for PLUG-06 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "VER-01"
+workflow = "Core/dictionary unit coverage"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#VER-01"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["VER-01-ACCEPTANCE"]
+windows_scenarios = ["WIN-VER-01"]
+supported_platforms = ["windows"]
+owner = "quality"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for VER-01 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "VER-02"
+workflow = "Translation coverage"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#VER-02"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["VER-02-ACCEPTANCE"]
+windows_scenarios = ["WIN-VER-02"]
+supported_platforms = ["windows"]
+owner = "quality"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for VER-02 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "VER-03"
+workflow = "TTS/capture coverage"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#VER-03"]
+evidence_status = "observed-static"
+implementation_status = "implemented"
+automated_tests = ["VER-03-ACCEPTANCE"]
+windows_scenarios = ["WIN-VER-03"]
+supported_platforms = ["windows"]
+owner = "quality"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for VER-03 before setting verified."
+deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
+
+[[capabilities]]
+id = "VER-04"
+workflow = "GUI end-to-end and visual parity coverage"
+evidence_paths = ["docs/audit/parity-gap-matrix.md#VER-04"]
+evidence_status = "observed-static"
+implementation_status = "deferred"
+automated_tests = ["VER-04-ACCEPTANCE"]
+windows_scenarios = ["WIN-VER-04"]
+supported_platforms = ["windows"]
+owner = "quality"
+acceptance = "Pass the automated acceptance test and the recorded Windows scenario for VER-04 before setting verified."
+deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
