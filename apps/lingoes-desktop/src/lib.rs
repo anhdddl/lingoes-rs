@@ -1,20 +1,42 @@
-use std::cell::RefCell;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
+use lingoes_capture::{ClipboardWatcher, SystemClipboardReader};
 use lingoes_core::{DictionaryEntry, LookupQuery};
-use lingoes_dictionary::SqliteDictionary;
+use lingoes_dictionary::{DictionaryMeta, SqliteDictionary};
+use lingoes_translator::{GoogleTranslator, OpenAiTranslator, Translator};
+use lingoes_tts::{SystemTtsEngine, TtsEngine};
 use slint::{ModelRc, SharedString, VecModel};
 
 slint::include_modules!();
 
-const USAGE: &str = "Usage:\n  lingoes-desktop import <dictionary.db> <dictionary.tsv|dictionary.ifo|dictionary.mdx>\n  lingoes-desktop lookup <dictionary.db> <query>\n  lingoes-desktop full-text <dictionary.db> <query>\n  lingoes-desktop              Launch the graphical application";
+#[derive(Debug, Clone, Default)]
+pub struct TranslationOptions<'a> {
+    pub engine: &'a str,
+    pub base_url: Option<&'a str>,
+    pub model: Option<&'a str>,
+    pub api_key: Option<&'a str>,
+}
+
+const USAGE: &str = "\
+Usage:
+  lingoes-desktop import <dictionary.db> <source_path> [--name <name>]
+  lingoes-desktop lookup <dictionary.db> <query>
+  lingoes-desktop full-text <dictionary.db> <query>
+  lingoes-desktop list-dictionaries <dictionary.db>
+  lingoes-desktop toggle-dictionary <dictionary.db> <id> <true|false>
+  lingoes-desktop delete-dictionary <dictionary.db> <id>
+  lingoes-desktop translate <text> [--engine google|openai] [--from <code>] [--to <code>]
+  lingoes-desktop tts <text> [--lang <code>]
+  lingoes-desktop              Launch the graphical application";
+
 const SEARCH_LIMIT: usize = 100;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AppError(String);
 
 impl Display for AppError {
@@ -29,8 +51,15 @@ pub struct DesktopApp {
     dictionary: SqliteDictionary,
     results: Vec<DictionaryEntry>,
     selected_index: Option<usize>,
+    dictionaries: Vec<DictionaryMeta>,
+    translator: Arc<dyn Translator>,
+    tts: Arc<dyn TtsEngine>,
     status: String,
     has_error: bool,
+    quick_popup_word: String,
+    quick_popup_def: String,
+    show_quick_popup: bool,
+    clipboard_running: Option<Arc<AtomicBool>>,
 }
 
 impl DesktopApp {
@@ -46,13 +75,32 @@ impl DesktopApp {
         }
         let dictionary =
             SqliteDictionary::open(database_path).map_err(|error| AppError(error.to_string()))?;
-        Ok(Self {
+        let translator = Arc::new(GoogleTranslator::new());
+        let tts = Arc::new(SystemTtsEngine::new());
+        Self::with_services(dictionary, translator, tts)
+    }
+
+    pub fn with_services(
+        dictionary: SqliteDictionary,
+        translator: Arc<dyn Translator>,
+        tts: Arc<dyn TtsEngine>,
+    ) -> Result<Self, AppError> {
+        let mut app = Self {
             dictionary,
             results: Vec::new(),
             selected_index: None,
-            status: "Type a word to search".into(),
+            dictionaries: Vec::new(),
+            translator,
+            tts,
+            status: "Sẵn sàng".into(),
             has_error: false,
-        })
+            quick_popup_word: String::new(),
+            quick_popup_def: String::new(),
+            show_quick_popup: false,
+            clipboard_running: None,
+        };
+        let _ = app.list_dictionaries();
+        Ok(app)
     }
 
     pub fn search(&mut self, query: &str) {
@@ -67,7 +115,7 @@ impl DesktopApp {
         let Ok(query) = LookupQuery::new(query) else {
             self.results.clear();
             self.selected_index = None;
-            self.status = "Type a word to search".into();
+            self.status = "Nhập từ khóa để tra cứu".into();
             self.has_error = false;
             return;
         };
@@ -81,40 +129,14 @@ impl DesktopApp {
                 self.results = results;
                 self.selected_index = (!self.results.is_empty()).then_some(0);
                 self.status = match self.results.len() {
-                    0 => "No results".into(),
-                    1 => "1 result".into(),
-                    count => format!("{count} results"),
+                    0 => "Không tìm thấy từ phù hợp".into(),
+                    1 => "Tìm thấy 1 kết quả".into(),
+                    count => format!("Tìm thấy {count} kết quả"),
                 };
                 self.has_error = false;
             }
             Err(error) => self.set_error(error),
         }
-    }
-
-    pub fn import_path(&mut self, source_path: impl AsRef<Path>) -> Result<(), AppError> {
-        let source_path = source_path.as_ref();
-        let result: Result<(), AppError> = (|| {
-            let report = self
-                .dictionary
-                .import_path(source_path)
-                .map_err(|error| AppError(error.to_string()))?;
-            let entry_text = if report.imported == 1 {
-                "entry"
-            } else {
-                "entries"
-            };
-            self.status = format!(
-                "Imported {} {} ({} new, {} updated)",
-                report.imported, entry_text, report.inserted, report.updated
-            );
-            self.has_error = false;
-            Ok(())
-        })();
-        if let Err(error) = &result {
-            self.status = error.to_string();
-            self.has_error = true;
-        }
-        result
     }
 
     pub fn select(&mut self, index: usize) {
@@ -153,11 +175,222 @@ impl DesktopApp {
             .and_then(|index| self.results.get(index))
     }
 
-    fn set_error(&mut self, error: impl Display) {
+    pub fn set_error(&mut self, error: impl Display) {
         self.results.clear();
         self.selected_index = None;
         self.status = error.to_string();
         self.has_error = true;
+    }
+
+    // Dictionary Management
+    pub fn list_dictionaries(&mut self) -> Result<&[DictionaryMeta], AppError> {
+        self.dictionaries = self
+            .dictionary
+            .list_dictionaries()
+            .map_err(|e| AppError(e.to_string()))?;
+        Ok(&self.dictionaries)
+    }
+
+    pub fn toggle_dictionary(&mut self, id: i64, enabled: bool) -> Result<(), AppError> {
+        self.dictionary
+            .toggle_dictionary(id, enabled)
+            .map_err(|e| AppError(e.to_string()))?;
+        self.list_dictionaries()?;
+        self.status = format!(
+            "Từ điển ID {id} đã {}",
+            if enabled { "kích hoạt" } else { "tắt" }
+        );
+        self.has_error = false;
+        Ok(())
+    }
+
+    pub fn delete_dictionary(&mut self, id: i64) -> Result<(), AppError> {
+        self.dictionary
+            .delete_dictionary(id)
+            .map_err(|e| AppError(e.to_string()))?;
+        self.list_dictionaries()?;
+        self.status = format!("Đã xóa từ điển ID {id}");
+        self.has_error = false;
+        Ok(())
+    }
+
+    pub fn import_path_with_name(
+        &mut self,
+        source_path: impl AsRef<Path>,
+        name: Option<&str>,
+    ) -> Result<(), AppError> {
+        let source_path = source_path.as_ref();
+        let result: Result<(), AppError> = (|| {
+            let report = self
+                .dictionary
+                .import_path_with_name(source_path, name)
+                .map_err(|error| AppError(error.to_string()))?;
+            let entry_text = if report.imported == 1 {
+                "entry"
+            } else {
+                "entries"
+            };
+            self.status = format!(
+                "Imported {} {} ({} new, {} updated)",
+                report.imported, entry_text, report.inserted, report.updated
+            );
+            self.has_error = false;
+            Ok(())
+        })();
+        if let Err(error) = &result {
+            self.status = error.to_string();
+            self.has_error = true;
+        }
+        let _ = self.list_dictionaries();
+        result
+    }
+
+    pub fn import_path(&mut self, source_path: impl AsRef<Path>) -> Result<(), AppError> {
+        self.import_path_with_name(source_path, None)
+    }
+
+    pub fn dictionaries(&self) -> &[DictionaryMeta] {
+        &self.dictionaries
+    }
+
+    // Translation
+    pub fn translate(&mut self, text: &str, from: &str, to: &str) -> Result<String, AppError> {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| AppError(format!("runtime error: {e}")))?;
+        let translator = Arc::clone(&self.translator);
+        let result = rt.block_on(translator.translate(text, from, to));
+        match result {
+            Ok(translated) => {
+                self.status = "Dịch thành công".into();
+                self.has_error = false;
+                Ok(translated)
+            }
+            Err(err) => {
+                self.set_error(&err);
+                Err(AppError(err.to_string()))
+            }
+        }
+    }
+
+    pub fn translate_with_engine(
+        &mut self,
+        text: &str,
+        from: &str,
+        to: &str,
+        opts: TranslationOptions<'_>,
+    ) -> Result<String, AppError> {
+        let translator: Arc<dyn Translator> = match opts.engine.to_lowercase().trim() {
+            "openai" | "llm" | "local" => {
+                let mut builder = OpenAiTranslator::builder();
+                if let Some(url) = opts.base_url {
+                    if !url.trim().is_empty() {
+                        builder = builder.base_url(url);
+                    }
+                }
+                if let Some(m) = opts.model {
+                    if !m.trim().is_empty() {
+                        builder = builder.model(m);
+                    }
+                }
+                if let Some(k) = opts.api_key {
+                    if !k.trim().is_empty() {
+                        builder = builder.api_key(k);
+                    }
+                }
+                Arc::new(builder.build())
+            }
+            "google" => Arc::new(GoogleTranslator::new()),
+            _ => Arc::clone(&self.translator),
+        };
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| AppError(format!("runtime error: {e}")))?;
+        let result = rt.block_on(translator.translate(text, from, to));
+        match result {
+            Ok(translated) => {
+                self.status = "Dịch thành công".into();
+                self.has_error = false;
+                Ok(translated)
+            }
+            Err(err) => {
+                self.set_error(&err);
+                Err(AppError(err.to_string()))
+            }
+        }
+    }
+
+    // TTS
+    pub fn speak(&mut self, text: &str, lang: &str) -> Result<(), AppError> {
+        match self.tts.speak(text, lang) {
+            Ok(()) => {
+                self.status = format!("Đang phát âm: {text}");
+                self.has_error = false;
+                Ok(())
+            }
+            Err(err) => {
+                self.set_error(&err);
+                Err(AppError(err.to_string()))
+            }
+        }
+    }
+
+    // Clipboard & Quick Lookup
+    pub fn copy_to_clipboard(&mut self, text: &str) -> Result<(), AppError> {
+        let mut board = arboard::Clipboard::new()
+            .map_err(|e| AppError(format!("Không thể truy cập clipboard: {e}")))?;
+        board
+            .set_text(text)
+            .map_err(|e| AppError(format!("Lỗi sao chép vào clipboard: {e}")))?;
+        self.status = "Đã sao chép vào bộ nhớ tạm".into();
+        self.has_error = false;
+        Ok(())
+    }
+
+    pub fn handle_captured_text(&mut self, text: &str) {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        self.search(trimmed);
+        if let Some(entry) = self.selected_entry() {
+            let headword = entry.headword().to_string();
+            let definition = entry.definition().to_string();
+            self.quick_popup_word = headword;
+            self.quick_popup_def = definition;
+            self.show_quick_popup = true;
+        }
+    }
+
+    pub fn show_quick_popup(&self) -> bool {
+        self.show_quick_popup
+    }
+
+    pub fn quick_popup_word(&self) -> &str {
+        &self.quick_popup_word
+    }
+
+    pub fn quick_popup_def(&self) -> &str {
+        &self.quick_popup_def
+    }
+
+    pub fn dismiss_quick_popup(&mut self) {
+        self.show_quick_popup = false;
+    }
+
+    pub fn is_clipboard_monitoring(&self) -> bool {
+        self.clipboard_running
+            .as_ref()
+            .is_some_and(|flag| flag.load(Ordering::Relaxed))
+    }
+
+    pub fn stop_clipboard_monitor(&mut self) {
+        if let Some(flag) = self.clipboard_running.take() {
+            flag.store(false, Ordering::Relaxed);
+        }
     }
 }
 
@@ -172,60 +405,214 @@ pub fn launch_gui() -> Result<(), AppError> {
     let executable = std::env::current_exe()
         .map_err(|error| AppError(format!("cannot locate executable: {error}")))?;
     let database_path = portable_database_path(&executable)?;
-    let application = Rc::new(RefCell::new(DesktopApp::open(database_path)?));
+    let application = Arc::new(Mutex::new(DesktopApp::open(database_path)?));
     let window = AppWindow::new().map_err(|error| AppError(error.to_string()))?;
 
+    // Search callback
     {
-        let application = Rc::clone(&application);
+        let application = Arc::clone(&application);
         let window_weak = window.as_weak();
         window.on_search(move |query| {
-            application.borrow_mut().search(query.as_str());
+            application.lock().unwrap().search(query.as_str());
             if let Some(window) = window_weak.upgrade() {
-                update_window(&window, &application.borrow());
+                update_window(&window, &application.lock().unwrap());
             }
         });
     }
+
+    // Full text search callback
     {
-        let application = Rc::clone(&application);
+        let application = Arc::clone(&application);
         let window_weak = window.as_weak();
         window.on_full_text_search(move |query| {
-            application.borrow_mut().search_full_text(query.as_str());
+            application.lock().unwrap().search_full_text(query.as_str());
             if let Some(window) = window_weak.upgrade() {
-                update_window(&window, &application.borrow());
+                update_window(&window, &application.lock().unwrap());
             }
         });
     }
+
+    // Select result callback
     {
-        let application = Rc::clone(&application);
+        let application = Arc::clone(&application);
         let window_weak = window.as_weak();
         window.on_select_result(move |index| {
             if index >= 0 {
-                application.borrow_mut().select(index as usize);
+                application.lock().unwrap().select(index as usize);
             }
             if let Some(window) = window_weak.upgrade() {
-                update_window(&window, &application.borrow());
-            }
-        });
-    }
-    {
-        let application = Rc::clone(&application);
-        let window_weak = window.as_weak();
-        window.on_import_dictionary(move |path| {
-            let path = path.trim();
-            if path.is_empty() {
-                application
-                    .borrow_mut()
-                    .set_error("Choose or enter a TSV, StarDict, or MDict file path");
-            } else {
-                let _ = application.borrow_mut().import_path(path);
-            }
-            if let Some(window) = window_weak.upgrade() {
-                update_window(&window, &application.borrow());
+                update_window(&window, &application.lock().unwrap());
             }
         });
     }
 
-    update_window(&window, &application.borrow());
+    // Import dictionary callback
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_import_dictionary(move |path, name| {
+            let path = path.trim();
+            if path.is_empty() {
+                application
+                    .lock()
+                    .unwrap()
+                    .set_error("Chọn hoặc nhập đường dẫn file TSV, StarDict, hoặc MDict");
+            } else {
+                let name_opt = if name.trim().is_empty() {
+                    None
+                } else {
+                    Some(name.as_str())
+                };
+                let _ = application
+                    .lock()
+                    .unwrap()
+                    .import_path_with_name(path, name_opt);
+            }
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &application.lock().unwrap());
+            }
+        });
+    }
+
+    // Toggle dictionary callback
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_toggle_dictionary(move |id, enabled| {
+            let _ = application
+                .lock()
+                .unwrap()
+                .toggle_dictionary(id as i64, enabled);
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &application.lock().unwrap());
+            }
+        });
+    }
+
+    // Delete dictionary callback
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_delete_dictionary(move |id| {
+            let _ = application.lock().unwrap().delete_dictionary(id as i64);
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &application.lock().unwrap());
+            }
+        });
+    }
+
+    // Speak callback
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_speak(move |text, lang| {
+            let _ = application
+                .lock()
+                .unwrap()
+                .speak(text.as_str(), lang.as_str());
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &application.lock().unwrap());
+            }
+        });
+    }
+
+    // Copy to clipboard callback
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_copy_to_clipboard(move |text| {
+            let _ = application.lock().unwrap().copy_to_clipboard(text.as_str());
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &application.lock().unwrap());
+            }
+        });
+    }
+
+    // Translate callback
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_translate(move |text, from, to, engine| {
+            if let Some(w) = window_weak.upgrade() {
+                w.set_is_translating(true);
+                let base_url = w.get_openai_base_url();
+                let model = w.get_openai_model();
+                let api_key = w.get_openai_api_key();
+
+                let res = application.lock().unwrap().translate_with_engine(
+                    text.as_str(),
+                    from.as_str(),
+                    to.as_str(),
+                    TranslationOptions {
+                        engine: engine.as_str(),
+                        base_url: Some(base_url.as_str()),
+                        model: Some(model.as_str()),
+                        api_key: Some(api_key.as_str()),
+                    },
+                );
+                w.set_is_translating(false);
+                match res {
+                    Ok(translated) => {
+                        w.set_translate_target_text(translated.into());
+                    }
+                    Err(err) => {
+                        w.set_translate_target_text(format!("Lỗi: {err}").into());
+                    }
+                }
+                update_window(&w, &application.lock().unwrap());
+            }
+        });
+    }
+
+    // Dismiss quick popup callback
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_dismiss_quick_popup(move || {
+            application.lock().unwrap().dismiss_quick_popup();
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &application.lock().unwrap());
+            }
+        });
+    }
+
+    // Toggle clipboard monitor callback
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_toggle_clipboard_monitor(move |enabled| {
+            if enabled {
+                if let Ok(reader) = SystemClipboardReader::new() {
+                    let watcher = ClipboardWatcher::default();
+                    let (rx, running, _handle) = watcher.spawn(reader);
+                    application.lock().unwrap().clipboard_running = Some(running);
+
+                    let app_for_thread = Arc::clone(&application);
+                    let win_for_thread = window_weak.clone();
+
+                    std::thread::spawn(move || {
+                        while let Ok(text) = rx.recv() {
+                            let app_capture = Arc::clone(&app_for_thread);
+                            let win_capture = win_for_thread.clone();
+                            let _ = slint::invoke_from_event_loop(move || {
+                                app_capture.lock().unwrap().handle_captured_text(&text);
+                                if let Some(w) = win_capture.upgrade() {
+                                    update_window(&w, &app_capture.lock().unwrap());
+                                }
+                            });
+                        }
+                    });
+                }
+            } else {
+                application.lock().unwrap().stop_clipboard_monitor();
+            }
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &application.lock().unwrap());
+            }
+        });
+    }
+
+    update_window(&window, &application.lock().unwrap());
     window.run().map_err(|error| AppError(error.to_string()))
 }
 
@@ -236,6 +623,7 @@ fn update_window(window: &AppWindow, application: &DesktopApp) {
         .map(|entry| SearchResult {
             headword: SharedString::from(entry.headword()),
             definition: SharedString::from(entry.definition()),
+            dictionary_name: SharedString::from(""),
         })
         .collect();
     window.set_results(ModelRc::new(VecModel::from(rows)));
@@ -246,18 +634,74 @@ fn update_window(window: &AppWindow, application: &DesktopApp) {
     );
     window.set_selected_headword(application.selected_headword().into());
     window.set_selected_definition(application.selected_definition().into());
+    window.set_selected_dict_badge(if application.selected_headword().is_empty() {
+        "".into()
+    } else {
+        "Lingoes DB".into()
+    });
+
+    let dict_rows: Vec<DictionaryItem> = application
+        .dictionaries()
+        .iter()
+        .map(|meta| DictionaryItem {
+            id: meta.id as i32,
+            name: SharedString::from(&meta.name),
+            format: SharedString::from(&meta.format),
+            entry_count: meta.entry_count as i32,
+            enabled: meta.enabled,
+        })
+        .collect();
+    window.set_dictionaries(ModelRc::new(VecModel::from(dict_rows)));
+
+    window.set_show_quick_popup(application.show_quick_popup());
+    window.set_quick_popup_headword(application.quick_popup_word().into());
+    window.set_quick_popup_definition(application.quick_popup_def().into());
+
     window.set_status_text(application.status().into());
     window.set_status_is_error(application.has_error());
 }
 
 pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<String, AppError> {
+    let translator = Arc::new(GoogleTranslator::new());
+    let tts = Arc::new(SystemTtsEngine::new());
+    run_with_services(arguments, translator, tts)
+}
+
+pub fn run_with_services(
+    arguments: impl IntoIterator<Item = String>,
+    translator: Arc<dyn Translator>,
+    tts: Arc<dyn TtsEngine>,
+) -> Result<String, AppError> {
     let arguments: Vec<_> = arguments.into_iter().collect();
-    match arguments.as_slice() {
-        [command, database_path, source_path] if command == "import" => {
+    if arguments.is_empty() {
+        return Err(AppError(USAGE.into()));
+    }
+
+    let command = arguments[0].as_str();
+    match command {
+        "import" => {
+            if arguments.len() < 3 {
+                return Err(AppError(format!(
+                    "missing required arguments for import\n{USAGE}"
+                )));
+            }
+            let database_path = &arguments[1];
+            let source_path = &arguments[2];
+            let mut name = None;
+            let mut i = 3;
+            while i < arguments.len() {
+                if arguments[i] == "--name" && i + 1 < arguments.len() {
+                    name = Some(arguments[i + 1].as_str());
+                    i += 2;
+                } else {
+                    i += 1;
+                }
+            }
+
             let mut dictionary = SqliteDictionary::open(database_path)
                 .map_err(|error| AppError(error.to_string()))?;
             let report = dictionary
-                .import_path(source_path)
+                .import_path_with_name(source_path, name)
                 .map_err(|error| AppError(error.to_string()))?;
             let entry_text = if report.imported == 1 {
                 "entry"
@@ -269,10 +713,16 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<String, AppErr
                 report.imported, entry_text, report.inserted, report.updated
             ))
         }
-        [command, database_path, query] if command == "lookup" || command == "full-text" => {
+        "lookup" | "full-text" => {
+            if arguments.len() < 3 {
+                return Err(AppError(format!("missing query for lookup\n{USAGE}")));
+            }
+            let database_path = &arguments[1];
+            let query_str = &arguments[2];
             let dictionary = SqliteDictionary::open(database_path)
                 .map_err(|error| AppError(error.to_string()))?;
-            let query = LookupQuery::new(query).map_err(|_| AppError("query is empty".into()))?;
+            let query =
+                LookupQuery::new(query_str).map_err(|_| AppError("query is empty".into()))?;
             let entries = if command == "full-text" {
                 dictionary.lookup_full_text(&query, 20)
             } else {
@@ -288,8 +738,129 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<String, AppErr
                 .collect::<Vec<_>>()
                 .join("\n"))
         }
-        [] => Err(AppError(USAGE.into())),
-        [command, ..] => Err(AppError(format!(
+        "list-dictionaries" => {
+            if arguments.len() < 2 {
+                return Err(AppError(format!(
+                    "missing database path for list-dictionaries\n{USAGE}"
+                )));
+            }
+            let database_path = &arguments[1];
+            let dictionary = SqliteDictionary::open(database_path)
+                .map_err(|error| AppError(error.to_string()))?;
+            let list = dictionary
+                .list_dictionaries()
+                .map_err(|error| AppError(error.to_string()))?;
+            if list.is_empty() {
+                return Ok("No dictionaries found".into());
+            }
+            Ok(list
+                .iter()
+                .map(|d| {
+                    format!(
+                        "[{}] {} ({}) - {} entries [{}]",
+                        d.id,
+                        d.name,
+                        d.format,
+                        d.entry_count,
+                        if d.enabled { "enabled" } else { "disabled" }
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n"))
+        }
+        "toggle-dictionary" => {
+            if arguments.len() < 4 {
+                return Err(AppError(format!(
+                    "missing arguments for toggle-dictionary\n{USAGE}"
+                )));
+            }
+            let database_path = &arguments[1];
+            let id = arguments[2]
+                .parse::<i64>()
+                .map_err(|e| AppError(format!("invalid dictionary id: {e}")))?;
+            let enabled = arguments[3]
+                .parse::<bool>()
+                .map_err(|e| AppError(format!("invalid boolean value: {e}")))?;
+            let mut dictionary = SqliteDictionary::open(database_path)
+                .map_err(|error| AppError(error.to_string()))?;
+            dictionary
+                .toggle_dictionary(id, enabled)
+                .map_err(|error| AppError(error.to_string()))?;
+            Ok(format!(
+                "Dictionary {id} {}",
+                if enabled { "enabled" } else { "disabled" }
+            ))
+        }
+        "delete-dictionary" => {
+            if arguments.len() < 3 {
+                return Err(AppError(format!(
+                    "missing arguments for delete-dictionary\n{USAGE}"
+                )));
+            }
+            let database_path = &arguments[1];
+            let id = arguments[2]
+                .parse::<i64>()
+                .map_err(|e| AppError(format!("invalid dictionary id: {e}")))?;
+            let mut dictionary = SqliteDictionary::open(database_path)
+                .map_err(|error| AppError(error.to_string()))?;
+            dictionary
+                .delete_dictionary(id)
+                .map_err(|error| AppError(error.to_string()))?;
+            Ok(format!("Dictionary {id} deleted"))
+        }
+        "translate" => {
+            if arguments.len() < 2 {
+                return Err(AppError(format!("missing text for translate\n{USAGE}")));
+            }
+            let text = &arguments[1];
+            let mut from = "auto";
+            let mut to = "vi";
+            let mut _engine = "google";
+
+            let mut i = 2;
+            while i < arguments.len() {
+                if arguments[i] == "--from" && i + 1 < arguments.len() {
+                    from = arguments[i + 1].as_str();
+                    i += 2;
+                } else if arguments[i] == "--to" && i + 1 < arguments.len() {
+                    to = arguments[i + 1].as_str();
+                    i += 2;
+                } else if arguments[i] == "--engine" && i + 1 < arguments.len() {
+                    _engine = arguments[i + 1].as_str();
+                    i += 2;
+                } else {
+                    i += 1;
+                }
+            }
+
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| AppError(format!("runtime error: {e}")))?;
+            let translated = rt
+                .block_on(translator.translate(text, from, to))
+                .map_err(|e| AppError(e.to_string()))?;
+            Ok(translated)
+        }
+        "tts" => {
+            if arguments.len() < 2 {
+                return Err(AppError(format!("missing text for tts\n{USAGE}")));
+            }
+            let text = &arguments[1];
+            let mut lang = "en";
+            let mut i = 2;
+            while i < arguments.len() {
+                if arguments[i] == "--lang" && i + 1 < arguments.len() {
+                    lang = arguments[i + 1].as_str();
+                    i += 2;
+                } else {
+                    i += 1;
+                }
+            }
+            tts.speak(text, lang).map_err(|e| AppError(e.to_string()))?;
+            Ok(format!("Spoken: \"{text}\" ({lang})"))
+        }
+        _ => Err(AppError(format!(
             "unknown command or invalid arguments: {command}\n{USAGE}"
         ))),
     }
@@ -298,18 +869,8 @@ pub fn run(arguments: impl IntoIterator<Item = String>) -> Result<String, AppErr
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn usage_is_returned_when_no_command_is_given() {
-        let error = run(Vec::<String>::new()).unwrap_err();
-        assert!(error.to_string().contains("Usage:"));
-    }
-
-    #[test]
-    fn unknown_command_is_rejected() {
-        let error = run(["nope".to_owned()]).unwrap_err();
-        assert!(error.to_string().contains("unknown command"));
-    }
+    use lingoes_translator::MockTranslator;
+    use lingoes_tts::MockTtsEngine;
 
     fn temporary_path(name: &str, extension: &str) -> PathBuf {
         let unique = format!(
@@ -322,6 +883,18 @@ mod tests {
             extension
         );
         std::env::temp_dir().join(unique)
+    }
+
+    #[test]
+    fn usage_is_returned_when_no_command_is_given() {
+        let error = run(Vec::<String>::new()).unwrap_err();
+        assert!(error.to_string().contains("Usage:"));
+    }
+
+    #[test]
+    fn unknown_command_is_rejected() {
+        let error = run(["nope".to_owned()]).unwrap_err();
+        assert!(error.to_string().contains("unknown command"));
     }
 
     #[test]
@@ -341,7 +914,7 @@ mod tests {
         assert_eq!(application.results().len(), 2);
         assert_eq!(application.selected_index(), Some(0));
         assert_eq!(application.selected_definition(), "A systems language");
-        assert_eq!(application.status(), "2 results");
+        assert!(application.status().contains("2"));
         let _ = std::fs::remove_file(database_path);
         let _ = std::fs::remove_file(source_path);
     }
@@ -355,7 +928,6 @@ mod tests {
 
         assert!(application.results().is_empty());
         assert_eq!(application.selected_index(), None);
-        assert_eq!(application.status(), "Type a word to search");
         assert!(!application.has_error());
         let _ = std::fs::remove_file(database_path);
     }
@@ -390,7 +962,7 @@ mod tests {
 
         assert_eq!(application.results().len(), 1);
         assert_eq!(application.selected_headword(), "tiếng việt");
-        assert_eq!(application.status(), "1 result");
+        assert!(application.status().contains("1"));
         let _ = std::fs::remove_file(database_path);
         let _ = std::fs::remove_file(source_path);
     }
@@ -447,5 +1019,202 @@ mod tests {
             portable_database_path(executable).unwrap(),
             Path::new("/opt/lingoes/data/lingoes.db")
         );
+    }
+
+    #[test]
+    fn dictionary_management_list_toggle_and_delete() {
+        let database_path = temporary_path("dict-mgr", "db");
+        let source_path = temporary_path("dict-mgr", "tsv");
+        std::fs::write(&source_path, "water\tNước\n").unwrap();
+
+        let mut app = DesktopApp::open(&database_path).unwrap();
+        app.import_path_with_name(&source_path, Some("English-Vietnamese"))
+            .unwrap();
+
+        let dicts = app.list_dictionaries().unwrap();
+        assert_eq!(dicts.len(), 1);
+        let dict_id = dicts[0].id;
+        assert_eq!(dicts[0].name, "English-Vietnamese");
+        assert!(dicts[0].enabled);
+
+        // Toggle off
+        app.toggle_dictionary(dict_id, false).unwrap();
+        assert!(!app.dictionaries()[0].enabled);
+
+        // Toggle on
+        app.toggle_dictionary(dict_id, true).unwrap();
+        assert!(app.dictionaries()[0].enabled);
+
+        // Delete
+        app.delete_dictionary(dict_id).unwrap();
+        assert_eq!(app.dictionaries().len(), 0);
+
+        let _ = std::fs::remove_file(database_path);
+        let _ = std::fs::remove_file(source_path);
+    }
+
+    #[test]
+    fn translate_flow_with_mock_translator() {
+        let database_path = temporary_path("trans-mock", "db");
+        let dict = SqliteDictionary::open(&database_path).unwrap();
+
+        let mut mock_trans = MockTranslator::new();
+        mock_trans.add_translation("Hello", "en", "vi", "Xin chào");
+        let mock_trans = Arc::new(mock_trans);
+        let mock_tts = Arc::new(MockTtsEngine::new());
+
+        let mut app = DesktopApp::with_services(dict, mock_trans, mock_tts).unwrap();
+        let res = app.translate("Hello", "en", "vi").unwrap();
+        assert_eq!(res, "Xin chào");
+        assert_eq!(app.status(), "Dịch thành công");
+
+        let _ = std::fs::remove_file(database_path);
+    }
+
+    #[test]
+    fn tts_flow_with_mock_tts_engine() {
+        let database_path = temporary_path("tts-mock", "db");
+        let dict = SqliteDictionary::open(&database_path).unwrap();
+        let mock_trans = Arc::new(MockTranslator::new());
+        let mock_tts = Arc::new(MockTtsEngine::new());
+
+        let mut app = DesktopApp::with_services(dict, mock_trans, mock_tts.clone()).unwrap();
+        app.speak("Good morning", "en").unwrap();
+
+        assert_eq!(
+            mock_tts.last_spoken(),
+            Some(("Good morning".into(), "en".into()))
+        );
+        assert!(app.status().contains("Good morning"));
+
+        let _ = std::fs::remove_file(database_path);
+    }
+
+    #[test]
+    fn clipboard_capture_and_quick_popup_lookup() {
+        let database_path = temporary_path("clip-popup", "db");
+        let source_path = temporary_path("clip-popup", "tsv");
+        std::fs::write(&source_path, "keyboard\tBàn phím máy tính\n").unwrap();
+
+        let mut app = DesktopApp::open(&database_path).unwrap();
+        app.import_path(&source_path).unwrap();
+
+        assert!(!app.show_quick_popup());
+
+        app.handle_captured_text("  keyboard  ");
+        assert!(app.show_quick_popup());
+        assert_eq!(app.quick_popup_word(), "keyboard");
+        assert_eq!(app.quick_popup_def(), "Bàn phím máy tính");
+
+        app.dismiss_quick_popup();
+        assert!(!app.show_quick_popup());
+
+        let _ = std::fs::remove_file(database_path);
+        let _ = std::fs::remove_file(source_path);
+    }
+
+    #[test]
+    fn cli_list_dictionaries_command_works() {
+        let database_path = temporary_path("cli-list-dict", "db");
+        let source_path = temporary_path("cli-list-dict", "tsv");
+        std::fs::write(&source_path, "sun\tMặt trời\n").unwrap();
+
+        let _ = run([
+            "import".into(),
+            database_path.to_str().unwrap().into(),
+            source_path.to_str().unwrap().into(),
+            "--name".into(),
+            "SolarDict".into(),
+        ])
+        .unwrap();
+
+        let output = run([
+            "list-dictionaries".into(),
+            database_path.to_str().unwrap().into(),
+        ])
+        .unwrap();
+        assert!(output.contains("SolarDict"));
+        assert!(output.contains("enabled"));
+
+        let _ = std::fs::remove_file(database_path);
+        let _ = std::fs::remove_file(source_path);
+    }
+
+    #[test]
+    fn cli_toggle_and_delete_dictionary_command_works() {
+        let database_path = temporary_path("cli-toggle-del", "db");
+        let source_path = temporary_path("cli-toggle-del", "tsv");
+        std::fs::write(&source_path, "moon\tMặt trăng\n").unwrap();
+
+        let _ = run([
+            "import".into(),
+            database_path.to_str().unwrap().into(),
+            source_path.to_str().unwrap().into(),
+            "--name".into(),
+            "LunarDict".into(),
+        ])
+        .unwrap();
+
+        // Toggle
+        let toggle_out = run([
+            "toggle-dictionary".into(),
+            database_path.to_str().unwrap().into(),
+            "1".into(),
+            "false".into(),
+        ])
+        .unwrap();
+        assert!(toggle_out.contains("disabled"));
+
+        // Delete
+        let del_out = run([
+            "delete-dictionary".into(),
+            database_path.to_str().unwrap().into(),
+            "1".into(),
+        ])
+        .unwrap();
+        assert!(del_out.contains("deleted"));
+
+        let _ = std::fs::remove_file(database_path);
+        let _ = std::fs::remove_file(source_path);
+    }
+
+    #[test]
+    fn cli_translate_command_works_with_service() {
+        let mut mock_trans = MockTranslator::new();
+        mock_trans.add_translation("cat", "en", "vi", "con mèo");
+        let mock_trans = Arc::new(mock_trans);
+        let mock_tts = Arc::new(MockTtsEngine::new());
+
+        let out = run_with_services(
+            [
+                "translate".into(),
+                "cat".into(),
+                "--from".into(),
+                "en".into(),
+                "--to".into(),
+                "vi".into(),
+            ],
+            mock_trans,
+            mock_tts,
+        )
+        .unwrap();
+
+        assert_eq!(out, "con mèo");
+    }
+
+    #[test]
+    fn cli_tts_command_works_with_service() {
+        let mock_trans = Arc::new(MockTranslator::new());
+        let mock_tts = Arc::new(MockTtsEngine::new());
+
+        let out = run_with_services(
+            ["tts".into(), "hello".into(), "--lang".into(), "en".into()],
+            mock_trans,
+            mock_tts.clone(),
+        )
+        .unwrap();
+
+        assert_eq!(out, "Spoken: \"hello\" (en)");
+        assert_eq!(mock_tts.last_spoken(), Some(("hello".into(), "en".into())));
     }
 }

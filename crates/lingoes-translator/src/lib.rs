@@ -1,6 +1,10 @@
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
+
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 #[derive(Debug, Error)]
 pub enum TranslationError {
@@ -17,12 +21,12 @@ pub enum TranslationError {
 }
 
 pub trait Translator: Send + Sync {
-    fn translate(
-        &self,
-        text: &str,
-        from: &str,
-        to: &str,
-    ) -> impl std::future::Future<Output = Result<String, TranslationError>> + Send;
+    fn translate<'a>(
+        &'a self,
+        text: &'a str,
+        from: &'a str,
+        to: &'a str,
+    ) -> BoxFuture<'a, Result<String, TranslationError>>;
 }
 
 #[derive(Debug, Default, Clone)]
@@ -58,33 +62,35 @@ impl MockTranslator {
 }
 
 impl Translator for MockTranslator {
-    async fn translate(
-        &self,
-        text: &str,
-        from: &str,
-        to: &str,
-    ) -> Result<String, TranslationError> {
-        let trimmed = text.trim();
-        if trimmed.is_empty() {
-            return Err(TranslationError::EmptyText);
-        }
-        self.history
-            .lock()
-            .unwrap()
-            .push((text.to_owned(), from.to_owned(), to.to_owned()));
+    fn translate<'a>(
+        &'a self,
+        text: &'a str,
+        from: &'a str,
+        to: &'a str,
+    ) -> BoxFuture<'a, Result<String, TranslationError>> {
+        Box::pin(async move {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                return Err(TranslationError::EmptyText);
+            }
+            self.history
+                .lock()
+                .unwrap()
+                .push((text.to_owned(), from.to_owned(), to.to_owned()));
 
-        if let Some(err) = &self.simulated_error {
-            return Err(TranslationError::Other(err.clone()));
-        }
+            if let Some(err) = &self.simulated_error {
+                return Err(TranslationError::Other(err.clone()));
+            }
 
-        if let Some(translation) =
-            self.canned
-                .get(&(text.to_owned(), from.to_owned(), to.to_owned()))
-        {
-            return Ok(translation.clone());
-        }
+            if let Some(translation) =
+                self.canned
+                    .get(&(text.to_owned(), from.to_owned(), to.to_owned()))
+            {
+                return Ok(translation.clone());
+            }
 
-        Ok(format!("[{from}->{to}] {text}"))
+            Ok(format!("[{from}->{to}] {text}"))
+        })
     }
 }
 
@@ -121,59 +127,61 @@ impl Default for GoogleTranslator {
 }
 
 impl Translator for GoogleTranslator {
-    async fn translate(
-        &self,
-        text: &str,
-        from: &str,
-        to: &str,
-    ) -> Result<String, TranslationError> {
-        let trimmed = text.trim();
-        if trimmed.is_empty() {
-            return Err(TranslationError::EmptyText);
-        }
-
-        let url = format!("{}/translate_a/single", self.base_url.trim_end_matches('/'));
-        let response = self
-            .client
-            .get(&url)
-            .query(&[
-                ("client", "gtx"),
-                ("sl", from),
-                ("tl", to),
-                ("dt", "t"),
-                ("q", text),
-            ])
-            .send()
-            .await?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let message = response.text().await.unwrap_or_default();
-            return Err(TranslationError::Api {
-                status: status.as_u16(),
-                message,
-            });
-        }
-
-        let json: serde_json::Value = response.json().await?;
-        let segments = json.get(0).and_then(|v| v.as_array()).ok_or_else(|| {
-            TranslationError::InvalidResponse("missing root segment array".into())
-        })?;
-
-        let mut translated = String::new();
-        for segment in segments {
-            if let Some(text_piece) = segment.get(0).and_then(|v| v.as_str()) {
-                translated.push_str(text_piece);
+    fn translate<'a>(
+        &'a self,
+        text: &'a str,
+        from: &'a str,
+        to: &'a str,
+    ) -> BoxFuture<'a, Result<String, TranslationError>> {
+        Box::pin(async move {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                return Err(TranslationError::EmptyText);
             }
-        }
 
-        if translated.is_empty() {
-            return Err(TranslationError::InvalidResponse(
-                "no translated fragments in response".into(),
-            ));
-        }
+            let url = format!("{}/translate_a/single", self.base_url.trim_end_matches('/'));
+            let response = self
+                .client
+                .get(&url)
+                .query(&[
+                    ("client", "gtx"),
+                    ("sl", from),
+                    ("tl", to),
+                    ("dt", "t"),
+                    ("q", text),
+                ])
+                .send()
+                .await?;
 
-        Ok(translated)
+            let status = response.status();
+            if !status.is_success() {
+                let message = response.text().await.unwrap_or_default();
+                return Err(TranslationError::Api {
+                    status: status.as_u16(),
+                    message,
+                });
+            }
+
+            let json: serde_json::Value = response.json().await?;
+            let segments = json.get(0).and_then(|v| v.as_array()).ok_or_else(|| {
+                TranslationError::InvalidResponse("missing root segment array".into())
+            })?;
+
+            let mut translated = String::new();
+            for segment in segments {
+                if let Some(text_piece) = segment.get(0).and_then(|v| v.as_str()) {
+                    translated.push_str(text_piece);
+                }
+            }
+
+            if translated.is_empty() {
+                return Err(TranslationError::InvalidResponse(
+                    "no translated fragments in response".into(),
+                ));
+            }
+
+            Ok(translated)
+        })
     }
 }
 
@@ -237,64 +245,66 @@ impl OpenAiTranslator {
 }
 
 impl Translator for OpenAiTranslator {
-    async fn translate(
-        &self,
-        text: &str,
-        from: &str,
-        to: &str,
-    ) -> Result<String, TranslationError> {
-        let trimmed = text.trim();
-        if trimmed.is_empty() {
-            return Err(TranslationError::EmptyText);
-        }
+    fn translate<'a>(
+        &'a self,
+        text: &'a str,
+        from: &'a str,
+        to: &'a str,
+    ) -> BoxFuture<'a, Result<String, TranslationError>> {
+        Box::pin(async move {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                return Err(TranslationError::EmptyText);
+            }
 
-        let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
-        let mut request = self
-            .client
-            .post(&url)
-            .header("Content-Type", "application/json");
+            let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
+            let mut request = self
+                .client
+                .post(&url)
+                .header("Content-Type", "application/json");
 
-        if let Some(token) = &self.api_key {
-            request = request.header("Authorization", format!("Bearer {token}"));
-        }
+            if let Some(token) = &self.api_key {
+                request = request.header("Authorization", format!("Bearer {token}"));
+            }
 
-        let system_prompt = format!(
-            "You are a professional translator. Translate the text from {from} to {to}. Output only the translation without any explanation or extra text."
-        );
+            let system_prompt = format!(
+                "You are a professional translator. Translate the text from {from} to {to}. Output only the translation without any explanation or extra text."
+            );
 
-        let body = serde_json::json!({
-            "model": self.model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ]
-        });
-
-        let response = request.json(&body).send().await?;
-        let status = response.status();
-        if !status.is_success() {
-            let message = response.text().await.unwrap_or_default();
-            return Err(TranslationError::Api {
-                status: status.as_u16(),
-                message,
+            let body = serde_json::json!({
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                    },
+                    {
+                        "role": "user",
+                        "content": text
+                    }
+                ]
             });
-        }
 
-        let json: serde_json::Value = response.json().await?;
-        let translation = json
-            .pointer("/choices/0/message/content")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| {
-                TranslationError::InvalidResponse("missing choices[0].message.content".into())
-            })?;
+            let response = request.json(&body).send().await?;
+            let status = response.status();
+            if !status.is_success() {
+                let message = response.text().await.unwrap_or_default();
+                return Err(TranslationError::Api {
+                    status: status.as_u16(),
+                    message,
+                });
+            }
 
-        Ok(translation.trim().to_owned())
+            let json: serde_json::Value = response.json().await?;
+            let translation = json
+                .pointer("/choices/0/message/content")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    TranslationError::InvalidResponse("missing choices[0].message.content".into())
+                })?;
+
+            Ok(translation.trim().to_owned())
+        })
     }
 }
 

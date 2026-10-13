@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "apps/lingoes-desktop",
+    "crates/lingoes-capture",
     "crates/lingoes-core",
     "crates/lingoes-dictionary",
     "crates/lingoes-translator",
@@ -15,6 +16,9 @@ license = "MIT OR Apache-2.0"
 rust-version = "1.85"
 
 [workspace.dependencies]
+arboard = "3.4"
+crossbeam-channel = "0.5"
+lingoes-capture = { path = "crates/lingoes-capture" }
 lingoes-core = { path = "crates/lingoes-core" }
 lingoes-dictionary = { path = "crates/lingoes-dictionary" }
 lingoes-translator = { path = "crates/lingoes-translator" }
@@ -23,5 +27,5 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
 unicode-normalization = "0.1"
