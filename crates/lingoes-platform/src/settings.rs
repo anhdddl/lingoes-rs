@@ -125,11 +125,62 @@ pub struct HotkeyBinding {
     pub virtual_key: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CaptureModeSetting {
+    CursorWord,
+    SelectedText,
+    Clipboard,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct CaptureRuleSetting {
+    pub process: Option<String>,
+    pub window_class: Option<String>,
+    pub allow: bool,
+}
+impl Default for CaptureRuleSetting {
+    fn default() -> Self {
+        Self {
+            process: None,
+            window_class: None,
+            allow: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct CaptureSettings {
+    pub enabled: bool,
     pub clipboard: bool,
     pub cursor: bool,
+    pub mode: CaptureModeSetting,
+    pub delay_ms: u64,
+    pub debounce_ms: u64,
+    pub phrase_matching: bool,
+    pub allow_numbers: bool,
+    pub ocr_enabled: bool,
+    pub selection_clipboard_fallback: bool,
+    pub rules: Vec<CaptureRuleSetting>,
+}
+impl Default for CaptureSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            clipboard: false,
+            cursor: false,
+            mode: CaptureModeSetting::CursorWord,
+            delay_ms: 150,
+            debounce_ms: 300,
+            phrase_matching: false,
+            allow_numbers: true,
+            ocr_enabled: false,
+            selection_clipboard_fallback: false,
+            rules: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -272,6 +323,25 @@ mod tests {
             1,
             "atomic temporary file must not remain"
         );
+    }
+
+    #[test]
+    fn capture_settings_round_trip_full_milestone_five_configuration() {
+        let root = tempfile::tempdir().unwrap();
+        let store = SettingsStore::new(root.path().join("settings.toml"));
+        let mut settings = Settings::default();
+        settings.capture.enabled = true;
+        settings.capture.mode = CaptureModeSetting::SelectedText;
+        settings.capture.delay_ms = 250;
+        settings.capture.debounce_ms = 500;
+        settings.capture.ocr_enabled = true;
+        settings.capture.rules.push(CaptureRuleSetting {
+            process: Some("reader.exe".into()),
+            window_class: None,
+            allow: true,
+        });
+        store.save(&settings).unwrap();
+        assert_eq!(store.load().unwrap(), settings);
     }
 
     #[test]

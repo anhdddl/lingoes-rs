@@ -1,3 +1,14 @@
+mod clipboard_events;
+mod domain;
+mod pipeline;
+
+pub use clipboard_events::{ClipboardEventProcessor, DelayDebounceGate};
+pub use domain::*;
+pub use pipeline::*;
+
+#[cfg(windows)]
+pub mod windows;
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

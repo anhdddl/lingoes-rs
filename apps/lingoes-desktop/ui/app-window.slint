@@ -53,6 +53,9 @@ export component AppWindow inherits Window {
 
     // Tab 3: Settings
     in-out property <bool> clipboard-monitor-enabled: false;
+    in-out property <bool> cursor-capture-enabled: false;
+    in-out property <bool> selection-capture-enabled: false;
+    in-out property <bool> ocr-fallback-enabled: false;
     in-out property <string> openai-base-url: "http://localhost:20128/v1";
     in-out property <string> openai-model: "auto";
     in-out property <string> openai-api-key: "";
@@ -79,6 +82,7 @@ export component AppWindow inherits Window {
     callback toggle-dictionary(int, bool);
     callback delete-dictionary(int);
     callback toggle-clipboard-monitor(bool);
+    callback configure-capture(bool, bool, bool);
     callback dismiss-quick-popup();
 
     VerticalLayout {
@@ -609,6 +613,21 @@ export component AppWindow inherits Window {
                             text: "Tự động tra khi sao chép văn bản (Auto-lookup on Copy)";
                             checked <=> root.clipboard-monitor-enabled;
                             toggled => { root.toggle-clipboard-monitor(self.checked); }
+                        }
+                        CheckBox {
+                            text: "Bắt từ dưới con trỏ bằng Windows UI Automation";
+                            checked <=> root.cursor-capture-enabled;
+                            toggled => { root.configure-capture(self.checked, root.selection-capture-enabled, root.ocr-fallback-enabled); }
+                        }
+                        CheckBox {
+                            text: "Bắt văn bản được chọn / nhấp đúp";
+                            checked <=> root.selection-capture-enabled;
+                            toggled => { root.configure-capture(root.cursor-capture-enabled, self.checked, root.ocr-fallback-enabled); }
+                        }
+                        CheckBox {
+                            text: "Cho phép OCR dự phòng (chưa hỗ trợ trên bản dựng này)";
+                            checked <=> root.ocr-fallback-enabled;
+                            toggled => { root.configure-capture(root.cursor-capture-enabled, root.selection-capture-enabled, self.checked); }
                         }
 
                         Text {

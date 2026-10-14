@@ -2,14 +2,18 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(not(windows))]
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use lingoes_capture::{ClipboardWatcher, SystemClipboardReader};
+#[cfg(not(windows))]
+use lingoes_capture::ClipboardWatcher;
+use lingoes_capture::SystemClipboardReader;
 use lingoes_core::{DictionaryEntry, LookupQuery};
 use lingoes_dictionary::{DictionaryMeta, SqliteDictionary};
 use lingoes_platform::settings::{
-    DataRoot, Settings, SettingsStore, resolve_data_root, system_installed_data_base,
+    CaptureModeSetting, DataRoot, Settings, SettingsStore, resolve_data_root,
+    system_installed_data_base,
 };
 use lingoes_translator::{GoogleTranslator, OpenAiTranslator, Translator};
 use lingoes_tts::{SystemTtsEngine, TtsEngine};
@@ -63,7 +67,10 @@ pub struct DesktopApp {
     quick_popup_word: String,
     quick_popup_def: String,
     show_quick_popup: bool,
+    #[cfg(not(windows))]
     clipboard_running: Option<Arc<AtomicBool>>,
+    #[cfg(windows)]
+    clipboard_listener: Option<lingoes_capture::windows::WindowsClipboardListener>,
     settings: Settings,
 }
 
@@ -102,7 +109,10 @@ impl DesktopApp {
             quick_popup_word: String::new(),
             quick_popup_def: String::new(),
             show_quick_popup: false,
+            #[cfg(not(windows))]
             clipboard_running: None,
+            #[cfg(windows)]
+            clipboard_listener: None,
             settings: Settings::default(),
         };
         let _ = app.list_dictionaries();
@@ -400,15 +410,29 @@ impl DesktopApp {
     }
 
     pub fn is_clipboard_monitoring(&self) -> bool {
-        self.clipboard_running
-            .as_ref()
-            .is_some_and(|flag| flag.load(Ordering::Relaxed))
+        #[cfg(not(windows))]
+        {
+            self.clipboard_running
+                .as_ref()
+                .is_some_and(|flag| flag.load(Ordering::Relaxed))
+        }
+        #[cfg(windows)]
+        {
+            self.clipboard_listener.is_some()
+        }
     }
 
     pub fn stop_clipboard_monitor(&mut self) {
+        #[cfg(not(windows))]
         if let Some(flag) = self.clipboard_running.take() {
             flag.store(false, Ordering::Relaxed);
         }
+        #[cfg(windows)]
+        if let Some(listener) = self.clipboard_listener.take() {
+            listener.stop();
+        }
+        self.settings.capture.enabled = false;
+        self.settings.capture.clipboard = false;
     }
 }
 
@@ -652,6 +676,24 @@ pub fn launch_gui() -> Result<(), AppError> {
         });
     }
 
+    // Capture mode settings feed all captured text through handle_captured_text.
+    {
+        let application = Arc::clone(&application);
+        window.on_configure_capture(move |cursor, selection, ocr| {
+            let mut app = application.lock().unwrap();
+            app.settings.capture.cursor = cursor;
+            app.settings.capture.ocr_enabled = ocr;
+            app.settings.capture.mode = if selection {
+                CaptureModeSetting::SelectedText
+            } else if cursor {
+                CaptureModeSetting::CursorWord
+            } else {
+                CaptureModeSetting::Clipboard
+            };
+            app.settings.capture.enabled = cursor || selection || app.settings.capture.clipboard;
+        });
+    }
+
     // Dismiss quick popup callback
     {
         let application = Arc::clone(&application);
@@ -670,10 +712,15 @@ pub fn launch_gui() -> Result<(), AppError> {
         let window_weak = window.as_weak();
         window.on_toggle_clipboard_monitor(move |enabled| {
             if enabled {
+                #[cfg(not(windows))]
                 if let Ok(reader) = SystemClipboardReader::new() {
                     let watcher = ClipboardWatcher::default();
                     let (rx, running, _handle) = watcher.spawn(reader);
-                    application.lock().unwrap().clipboard_running = Some(running);
+                    let mut guard = application.lock().unwrap();
+                    guard.clipboard_running = Some(running);
+                    guard.settings.capture.enabled = true;
+                    guard.settings.capture.clipboard = true;
+                    drop(guard);
 
                     let app_for_thread = Arc::clone(&application);
                     let win_for_thread = window_weak.clone();
@@ -690,6 +737,34 @@ pub fn launch_gui() -> Result<(), AppError> {
                             });
                         }
                     });
+                }
+                #[cfg(windows)]
+                if let Ok(reader) = SystemClipboardReader::new() {
+                    use lingoes_capture::ClipboardReader;
+                    use std::time::Duration;
+                    let reader = Arc::new(Mutex::new(reader));
+                    let source = Arc::clone(&reader);
+                    let app_for_event = Arc::clone(&application);
+                    let win_for_event = window_weak.clone();
+                    if let Ok(listener) = lingoes_capture::windows::WindowsClipboardListener::spawn(
+                        Duration::from_millis(300),
+                        move || source.lock().ok()?.get_text().ok(),
+                        move |text| {
+                            let app_capture = Arc::clone(&app_for_event);
+                            let win_capture = win_for_event.clone();
+                            let _ = slint::invoke_from_event_loop(move || {
+                                app_capture.lock().unwrap().handle_captured_text(&text);
+                                if let Some(window) = win_capture.upgrade() {
+                                    update_window(&window, &app_capture.lock().unwrap());
+                                }
+                            });
+                        },
+                    ) {
+                        let mut guard = application.lock().unwrap();
+                        guard.clipboard_listener = Some(listener);
+                        guard.settings.capture.enabled = true;
+                        guard.settings.capture.clipboard = true;
+                    }
                 }
             } else {
                 application.lock().unwrap().stop_clipboard_monitor();
@@ -741,6 +816,13 @@ fn update_window(window: &AppWindow, application: &DesktopApp) {
         .collect();
     window.set_dictionaries(ModelRc::new(VecModel::from(dict_rows)));
 
+    window.set_clipboard_monitor_enabled(application.is_clipboard_monitoring());
+    window.set_cursor_capture_enabled(application.settings().capture.cursor);
+    window.set_selection_capture_enabled(matches!(
+        application.settings().capture.mode,
+        CaptureModeSetting::SelectedText
+    ));
+    window.set_ocr_fallback_enabled(application.settings().capture.ocr_enabled);
     window.set_show_quick_popup(application.show_quick_popup());
     window.set_quick_popup_headword(application.quick_popup_word().into());
     window.set_quick_popup_definition(application.quick_popup_def().into());

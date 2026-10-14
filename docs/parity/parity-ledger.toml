@@ -474,13 +474,13 @@ id = "CAP-01"
 workflow = "Capture the word under the mouse cursor from arbitrary Windows applications"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-01"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["CAP-01-ACCEPTANCE"]
 windows_scenarios = ["WIN-CAP-01"]
 supported_platforms = ["windows"]
 owner = "capture"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-01 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Windows UI Automation ElementFromPoint with TextPattern2/TextPattern word expansion is implemented under cfg(windows); native Windows runtime verification and target-application matrix are NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -488,13 +488,13 @@ id = "CAP-02"
 workflow = "Configurable mouse activation buttons and capture delay"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-02"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["CAP-02-ACCEPTANCE"]
 windows_scenarios = ["WIN-CAP-02"]
 supported_platforms = ["windows"]
 owner = "capture"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-02 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Capture activation button/modifier/double-click domain model and deterministic delay/debounce gate are implemented; Windows input activation runtime wiring and verification are NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -502,13 +502,13 @@ id = "CAP-03"
 workflow = "Phrase matching and script/number ignore filters"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-03"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["CAP-03-ACCEPTANCE"]
 windows_scenarios = ["WIN-CAP-03"]
 supported_platforms = ["windows"]
 owner = "capture"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-03 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Bounded phrase normalization and Latin, Cyrillic, Arabic, Hebrew, CJK, and number filters have deterministic tests; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -516,13 +516,13 @@ id = "CAP-04"
 workflow = "Translate selected text and double-click selection"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-04"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["CAP-04-ACCEPTANCE"]
 windows_scenarios = ["WIN-CAP-04"]
 supported_platforms = ["windows"]
 owner = "capture"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-04 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "UIA focused selection extraction, double-click activation semantics, and opt-in clipboard fallback with tested text snapshot restoration are implemented; all clipboard formats, SendInput copy gesture, and Windows runtime verification are NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -530,13 +530,13 @@ id = "CAP-05"
 workflow = "Per-program/per-window selection filter rules and window-class capture tool"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-05"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["CAP-05-ACCEPTANCE"]
 windows_scenarios = ["WIN-CAP-05"]
 supported_platforms = ["windows"]
 owner = "capture"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-05 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Case-insensitive process and window-class allow/deny rules with secure-context default deny and persisted settings are implemented; interactive window-class picker and Windows runtime verification are NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
