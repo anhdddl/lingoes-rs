@@ -6,17 +6,26 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
 use windows::Win32::Foundation::{
-    ERROR_HOTKEY_ALREADY_REGISTERED, GetLastError, HWND, LPARAM, LRESULT, WPARAM,
+    BOOL, ERROR_HOTKEY_ALREADY_REGISTERED, GetLastError, HWND, LPARAM, LRESULT, POINT, RECT,
+    SetLastError, WIN32_ERROR, WPARAM,
 };
+use windows::Win32::Graphics::Gdi::{
+    EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO,
+};
+use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Input::KeyboardAndMouse::{RegisterHotKey, UnregisterHotKey};
 use windows::Win32::UI::Shell::{
     NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY, NIM_SETVERSION,
     NOTIFYICON_VERSION_4, NOTIFYICONDATAW, Shell_NotifyIconW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, HICON,
-    HWND_MESSAGE, IDI_APPLICATION, LoadIconW, MSG, PostMessageW, PostQuitMessage, RegisterClassW,
-    RegisterWindowMessageW, TranslateMessage, WM_APP, WM_DESTROY, WM_HOTKEY, WNDCLASSW,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GWL_EXSTYLE, GetCursorPos,
+    GetMessageW, GetWindowLongPtrW, HICON, HWND_MESSAGE, HWND_NOTOPMOST, HWND_TOPMOST,
+    IDI_APPLICATION, IsWindow, LoadIconW, MSG, PostMessageW, PostQuitMessage, RegisterClassW,
+    RegisterWindowMessageW, SET_WINDOW_POS_FLAGS, SW_HIDE, SWP_FRAMECHANGED, SWP_NOACTIVATE,
+    SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW, SetWindowLongPtrW, SetWindowPos,
+    ShowWindow, TranslateMessage, WINDOW_EX_STYLE, WM_APP, WM_DESTROY, WM_HOTKEY, WNDCLASSW,
+    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
 };
 use windows::core::PCWSTR;
 
@@ -366,8 +375,300 @@ fn wide(value: &str) -> Vec<u16> {
     OsStr::new(value).encode_wide().chain(Some(0)).collect()
 }
 
+#[derive(Debug, Clone, Copy)]
+struct WindowConfiguration {
+    extended_style: WINDOW_EX_STYLE,
+    position_flags: SET_WINDOW_POS_FLAGS,
+}
+
+fn window_configuration(behavior: crate::popup::PopupNativeBehavior) -> WindowConfiguration {
+    let mut extended_style = WINDOW_EX_STYLE(0);
+    if behavior.no_activate {
+        extended_style |= WS_EX_NOACTIVATE;
+    }
+    if behavior.tool_window {
+        extended_style |= WS_EX_TOOLWINDOW;
+    }
+
+    let mut position_flags = SWP_SHOWWINDOW;
+    if !behavior.activate {
+        position_flags |= SWP_NOACTIVATE;
+    }
+    WindowConfiguration {
+        extended_style,
+        position_flags,
+    }
+}
+
+/// Adapts a caller-owned Win32 window to the popup policy in [`crate::popup`].
+///
+/// This adapter never destroys the window. The caller must keep the `HWND` alive
+/// and invoke it on a thread that is allowed to manipulate that window.
+#[derive(Debug, Clone, Copy)]
+pub struct WindowsPopupWindowAdapter {
+    hwnd: HWND,
+}
+
+impl WindowsPopupWindowAdapter {
+    /// Wraps a caller-owned window after validating that it currently exists.
+    pub fn new(hwnd: HWND) -> Result<Self, PlatformError> {
+        // SAFETY: `IsWindow` only inspects the supplied handle. It does not dereference a
+        // Rust pointer; stale or null handles are reported as invalid.
+        if !unsafe { IsWindow(hwnd) }.as_bool() {
+            return Err(PlatformError::Other(
+                "popup HWND is not a live window".into(),
+            ));
+        }
+        Ok(Self { hwnd })
+    }
+
+    /// Wraps the raw integer representation used by windowing-toolkit APIs.
+    pub fn from_raw(raw: isize) -> Result<Self, PlatformError> {
+        Self::new(HWND(raw as *mut _))
+    }
+
+    pub fn hwnd(&self) -> HWND {
+        self.hwnd
+    }
+
+    /// Applies native popup styles without making the caller-owned window visible.
+    pub fn prepare(&self, activation: crate::popup::PopupActivation) -> Result<(), PlatformError> {
+        let behavior = crate::popup::native_behavior(activation);
+        let configuration = window_configuration(behavior);
+        let style_changed = self.apply_extended_style(configuration.extended_style)?;
+        if style_changed {
+            // SAFETY: the HWND is caller-owned and validated. This refreshes the non-client frame
+            // without moving, resizing, activating, changing z-order, or showing the window.
+            unsafe {
+                SetWindowPos(
+                    self.hwnd,
+                    HWND_NOTOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER,
+                )
+            }
+            .map_err(|error| {
+                PlatformError::Other(format!("cannot prepare popup window: {error}"))
+            })?;
+        }
+        Ok(())
+    }
+
+    /// Applies native style policy and shows the popup at a computed physical rect.
+    pub fn show(
+        &self,
+        activation: crate::popup::PopupActivation,
+        rect: crate::popup::PhysicalRect,
+    ) -> Result<(), PlatformError> {
+        if rect.is_empty() {
+            return Err(PlatformError::Other("popup rectangle is empty".into()));
+        }
+        let behavior = crate::popup::native_behavior(activation);
+        let configuration = window_configuration(behavior);
+        let style_changed = self.apply_extended_style(configuration.extended_style)?;
+
+        let width = rect.right.checked_sub(rect.left).ok_or_else(|| {
+            PlatformError::Other("popup rectangle width exceeds Win32 range".into())
+        })?;
+        let height = rect.bottom.checked_sub(rect.top).ok_or_else(|| {
+            PlatformError::Other("popup rectangle height exceeds Win32 range".into())
+        })?;
+        let insert_after = if behavior.topmost {
+            HWND_TOPMOST
+        } else {
+            HWND_NOTOPMOST
+        };
+        // SAFETY: the HWND is caller-owned and was validated at construction. Coordinates and
+        // flags are plain values; SetWindowPos validates the handle again atomically.
+        unsafe {
+            SetWindowPos(
+                self.hwnd,
+                insert_after,
+                rect.left,
+                rect.top,
+                width,
+                height,
+                configuration.position_flags
+                    | if style_changed {
+                        SWP_FRAMECHANGED
+                    } else {
+                        SET_WINDOW_POS_FLAGS(0)
+                    },
+            )
+        }
+        .map_err(|error| PlatformError::Other(format!("cannot show popup window: {error}")))
+    }
+
+    /// Hides the popup and removes its topmost status so it cannot remain above other apps.
+    pub fn hide(&self) -> Result<(), PlatformError> {
+        // SAFETY: the HWND is caller-owned and was validated at construction. This call changes
+        // only z-order; it deliberately avoids activation, movement, and resizing.
+        unsafe {
+            SetWindowPos(
+                self.hwnd,
+                HWND_NOTOPMOST,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            )
+        }
+        .map_err(|error| {
+            PlatformError::Other(format!("cannot remove popup topmost state: {error}"))
+        })?;
+        // SAFETY: ShowWindow accepts a live HWND and SW_HIDE; its return value is the prior
+        // visibility state, not an error indicator.
+        let _ = unsafe { ShowWindow(self.hwnd, SW_HIDE) };
+        Ok(())
+    }
+
+    fn apply_extended_style(&self, desired: WINDOW_EX_STYLE) -> Result<bool, PlatformError> {
+        // GetWindowLongPtrW and SetWindowLongPtrW use zero as both a valid result and an error
+        // sentinel, so clear and inspect last-error around each call.
+        // SAFETY: the adapter holds a validated HWND and GWL_EXSTYLE selects an integer style.
+        unsafe { SetLastError(WIN32_ERROR(0)) };
+        let current = unsafe { GetWindowLongPtrW(self.hwnd, GWL_EXSTYLE) };
+        if current == 0 {
+            // SAFETY: reads thread-local Win32 last-error immediately after the ambiguous call.
+            let error = unsafe { GetLastError() };
+            if error != WIN32_ERROR(0) {
+                return Err(last_error_code("cannot read popup extended style", error));
+            }
+        }
+        let controlled = WS_EX_NOACTIVATE.0 | WS_EX_TOOLWINDOW.0;
+        let next = (current as u32 & !controlled) | desired.0;
+        if next == current as u32 {
+            return Ok(false);
+        }
+
+        // SAFETY: same validated HWND; unrelated extended-style bits are preserved.
+        unsafe { SetLastError(WIN32_ERROR(0)) };
+        let previous = unsafe { SetWindowLongPtrW(self.hwnd, GWL_EXSTYLE, next as isize) };
+        if previous == 0 {
+            // SAFETY: reads thread-local Win32 last-error immediately after the ambiguous call.
+            let error = unsafe { GetLastError() };
+            if error != WIN32_ERROR(0) {
+                return Err(last_error_code("cannot set popup extended style", error));
+            }
+        }
+        Ok(true)
+    }
+}
+
+pub fn popup_cursor_position() -> Result<crate::popup::PhysicalPoint, PlatformError> {
+    let mut point = POINT::default();
+    // SAFETY: point is valid writable storage for the duration of the call.
+    unsafe { GetCursorPos(&mut point) }
+        .map_err(|error| PlatformError::Other(format!("cannot read cursor position: {error}")))?;
+    Ok(crate::popup::PhysicalPoint::new(point.x, point.y))
+}
+
+/// Enumerates physical monitor work areas and effective DPI for popup placement.
+pub fn popup_monitors() -> Result<Vec<crate::popup::Monitor>, PlatformError> {
+    struct Enumeration {
+        monitors: Vec<crate::popup::Monitor>,
+        error: Option<PlatformError>,
+    }
+
+    unsafe extern "system" fn callback(
+        monitor: HMONITOR,
+        _: HDC,
+        _: *mut RECT,
+        data: LPARAM,
+    ) -> BOOL {
+        // SAFETY: `data` points to the Enumeration borrowed for the synchronous
+        // EnumDisplayMonitors call below.
+        let enumeration = unsafe { &mut *(data.0 as *mut Enumeration) };
+        let mut info = MONITORINFO {
+            cbSize: size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        // SAFETY: monitor is supplied by EnumDisplayMonitors and info is writable.
+        if !unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
+            enumeration.error = Some(last_error("cannot read monitor work area"));
+            return BOOL(0);
+        }
+        let mut dpi_x = 96;
+        let mut dpi_y = 96;
+        // SAFETY: monitor is valid for the callback and both DPI outputs are writable. A DPI
+        // query can fail on older configurations; 96 DPI is a safe placement fallback.
+        let _ = unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y) };
+        enumeration.monitors.push(crate::popup::Monitor {
+            id: monitor.0 as usize as u64,
+            work_area: crate::popup::PhysicalRect::new(
+                info.rcWork.left,
+                info.rcWork.top,
+                info.rcWork.right,
+                info.rcWork.bottom,
+            ),
+            dpi: dpi_x,
+        });
+        BOOL(1)
+    }
+
+    let mut enumeration = Enumeration {
+        monitors: Vec::new(),
+        error: None,
+    };
+    // SAFETY: callback is valid and receives a pointer to `enumeration`; enumeration remains
+    // alive because EnumDisplayMonitors invokes callbacks synchronously.
+    let completed = unsafe {
+        EnumDisplayMonitors(
+            HDC::default(),
+            None,
+            Some(callback),
+            LPARAM((&mut enumeration as *mut Enumeration) as isize),
+        )
+    };
+    if let Some(error) = enumeration.error {
+        return Err(error);
+    }
+    if !completed.as_bool() {
+        return Err(last_error("cannot enumerate monitors"));
+    }
+    Ok(enumeration.monitors)
+}
+
+fn last_error_code(context: &str, code: WIN32_ERROR) -> PlatformError {
+    PlatformError::Other(format!("{context}: Windows error {}", code.0))
+}
+
 fn last_error(context: &str) -> PlatformError {
     // SAFETY: GetLastError has no preconditions.
     let code = unsafe { GetLastError() };
     PlatformError::Other(format!("{context}: Windows error {}", code.0))
+}
+
+#[cfg(test)]
+mod popup_adapter_tests {
+    use super::*;
+    use crate::popup::{PopupActivation, native_behavior};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SWP_NOACTIVATE, SWP_SHOWWINDOW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    };
+
+    #[test]
+    fn passive_policy_maps_to_nonactivating_tool_window_flags() {
+        let configuration = window_configuration(native_behavior(PopupActivation::Passive));
+
+        assert!(configuration.extended_style.contains(WS_EX_NOACTIVATE));
+        assert!(configuration.extended_style.contains(WS_EX_TOOLWINDOW));
+        assert!(configuration.position_flags.contains(SWP_NOACTIVATE));
+        assert!(configuration.position_flags.contains(SWP_SHOWWINDOW));
+    }
+
+    #[test]
+    fn keyboard_policy_removes_only_the_no_activate_flags() {
+        let configuration =
+            window_configuration(native_behavior(PopupActivation::KeyboardRequested));
+
+        assert!(!configuration.extended_style.contains(WS_EX_NOACTIVATE));
+        assert!(configuration.extended_style.contains(WS_EX_TOOLWINDOW));
+        assert!(!configuration.position_flags.contains(SWP_NOACTIVATE));
+        assert!(configuration.position_flags.contains(SWP_SHOWWINDOW));
+    }
 }

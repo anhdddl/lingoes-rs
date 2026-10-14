@@ -1,4 +1,5 @@
 pub mod ipc;
+pub mod popup;
 pub mod settings;
 
 use std::error::Error;

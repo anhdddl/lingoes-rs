@@ -1,0 +1,156 @@
+import { Button, ScrollView } from "std-widgets.slint";
+
+// A standalone lookup surface. AppWindow keeps its legacy quick-popup API
+// until the Rust controller is migrated to own this window.
+export component PopupWindow inherits Window {
+    title: root.headword == "" ? "Lingoes quick lookup" : root.headword + " — Lingoes";
+    preferred-width: root.expanded ? 560px : 340px;
+    preferred-height: root.expanded ? 480px : 180px;
+    min-width: 320px;
+    min-height: 180px;
+    background: #ffffff;
+    forward-focus: keyboard;
+
+    in property <string> headword;
+    in property <string> definition;
+    in property <string> dictionary-name;
+    in property <string> status-text;
+    in property <bool> can-go-previous: false;
+    in property <bool> can-go-next: false;
+    in property <bool> pinned: false;
+    in property <bool> expanded: false;
+
+    callback previous();
+    callback next();
+    callback copy();
+    callback speak();
+    callback pin(bool);
+    callback expand(bool);
+    callback open-main();
+    callback close();
+
+    keyboard := FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.Escape) {
+                root.close();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 10px;
+
+        Rectangle {
+            height: 42px;
+            background: #0b3558;
+            border-radius: 6px;
+
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 6px;
+                spacing: 6px;
+
+                Text {
+                    text: root.headword == "" ? "Quick lookup" : root.headword;
+                    color: #ffffff;
+                    font-size: 20px;
+                    font-weight: 800;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    horizontal-stretch: 1;
+                }
+
+                Button {
+                    text: root.pinned ? "Unpin" : "Pin";
+                    accessible-label: root.pinned ? "Unpin quick lookup window" : "Pin quick lookup window";
+                    clicked => { root.pin(!root.pinned); }
+                }
+                Button {
+                    text: "Close";
+                    accessible-label: "Close quick lookup window";
+                    clicked => { root.close(); }
+                }
+            }
+        }
+
+        if root.dictionary-name != "" : Text {
+            text: root.dictionary-name;
+            color: #334155;
+            font-size: 13px;
+            font-weight: 700;
+            overflow: elide;
+        }
+
+        Rectangle {
+            background: #ffffff;
+            border-color: #475569;
+            border-width: 1px;
+            border-radius: 6px;
+            vertical-stretch: 1;
+
+            ScrollView {
+                viewport-width: self.width;
+
+                Text {
+                    width: parent.width;
+                    text: root.definition == "" ? "No definition available." : root.definition;
+                    color: #111827;
+                    font-size: root.expanded ? 16px : 14px;
+                    wrap: word-wrap;
+                    vertical-alignment: top;
+                }
+            }
+        }
+
+        if root.expanded && root.status-text != "" : Text {
+            text: root.status-text;
+            color: #334155;
+            font-size: 13px;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            height: 38px;
+            spacing: 6px;
+
+            Button {
+                text: "Previous";
+                accessible-label: "Previous lookup result";
+                enabled: root.can-go-previous;
+                clicked => { root.previous(); }
+            }
+            Button {
+                text: "Next";
+                accessible-label: "Next lookup result";
+                enabled: root.can-go-next;
+                clicked => { root.next(); }
+            }
+            Button {
+                text: "Copy";
+                accessible-label: "Copy lookup result";
+                clicked => { root.copy(); }
+            }
+            Button {
+                text: "Speak";
+                accessible-label: "Speak headword";
+                clicked => { root.speak(); }
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            Button {
+                text: root.expanded ? "Compact" : "Expand";
+                accessible-label: root.expanded ? "Use compact view" : "Use expanded view";
+                clicked => { root.expand(!root.expanded); }
+            }
+            if root.expanded : Button {
+                text: "Open main";
+                accessible-label: "Open result in main window";
+                clicked => { root.open-main(); }
+            }
+        }
+    }
+}

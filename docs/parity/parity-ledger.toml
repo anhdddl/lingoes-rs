@@ -172,7 +172,7 @@ windows_scenarios = ["WIN-UI-12"]
 supported_platforms = ["windows"]
 owner = "desktop-shell"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-12 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "The standalone capture popup is implemented separately from the main window, but the distinct Lingoes-style mini-window workflow, keep-size resizing, roll-up/auto-roll-up and always-visible runtime policies remain unimplemented and deferred. Serialized mini-window fields only preserve forward-compatible defaults; Windows runtime and accessibility scenarios remain NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -186,7 +186,7 @@ windows_scenarios = ["WIN-UI-13"]
 supported_platforms = ["windows"]
 owner = "desktop-shell"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-13 before setting verified."
-deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+deviation = "The former in-window overlay has been replaced by a standalone accessible PopupWindow wired to capture lookup, pin/expand, navigation, copy, speech and open-main actions. Captured-text bounds are supported by the pure placement API but clipboard integration currently falls back to the cursor; native outside-click dismissal remains unimplemented. Windows focus/caret retention and accessibility scenarios remain NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -592,7 +592,7 @@ windows_scenarios = ["WIN-CAP-09"]
 supported_platforms = ["windows"]
 owner = "capture"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-09 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Pure monitor/DPI placement, flip/clamp, native passive activation policy, and the Win32 tool-window/topmost adapter are implemented for the standalone popup. Translucency, user-resized keep-size capture, mini-window roll-up/auto-roll-up and always-visible runtime behavior remain unimplemented and deferred; Windows focus/caret scenarios remain NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]

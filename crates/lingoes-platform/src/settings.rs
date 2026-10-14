@@ -81,6 +81,8 @@ pub struct Settings {
     pub shell: ShellSettings,
     pub hotkeys: HotkeySettings,
     pub capture: CaptureSettings,
+    pub popup: PopupSettings,
+    pub mini_window: MiniWindowSettings,
 }
 
 impl Default for Settings {
@@ -90,6 +92,48 @@ impl Default for Settings {
             shell: ShellSettings::default(),
             hotkeys: HotkeySettings::default(),
             capture: CaptureSettings::default(),
+            popup: PopupSettings::default(),
+            mini_window: MiniWindowSettings::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PopupSettings {
+    pub logical_width: u32,
+    pub logical_height: u32,
+    pub pinned: bool,
+    pub auto_pronounce: bool,
+}
+
+impl Default for PopupSettings {
+    fn default() -> Self {
+        Self {
+            logical_width: 340,
+            logical_height: 180,
+            pinned: false,
+            auto_pronounce: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct MiniWindowSettings {
+    pub logical_width: u32,
+    pub logical_height: u32,
+    pub always_visible: bool,
+    pub roll_up: bool,
+}
+
+impl Default for MiniWindowSettings {
+    fn default() -> Self {
+        Self {
+            logical_width: 480,
+            logical_height: 240,
+            always_visible: false,
+            roll_up: false,
         }
     }
 }
@@ -342,6 +386,42 @@ mod tests {
         });
         store.save(&settings).unwrap();
         assert_eq!(store.load().unwrap(), settings);
+    }
+
+    #[test]
+    fn popup_and_mini_window_settings_round_trip() {
+        let root = tempfile::tempdir().unwrap();
+        let store = SettingsStore::new(root.path().join("settings.toml"));
+        let mut settings = Settings::default();
+        settings.popup.logical_width = 512;
+        settings.popup.logical_height = 320;
+        settings.popup.pinned = true;
+        settings.popup.auto_pronounce = true;
+        settings.mini_window.logical_width = 720;
+        settings.mini_window.logical_height = 480;
+        settings.mini_window.always_visible = true;
+        settings.mini_window.roll_up = true;
+
+        store.save(&settings).unwrap();
+
+        assert_eq!(store.load().unwrap(), settings);
+    }
+
+    #[test]
+    fn settings_without_milestone_six_sections_use_defaults() {
+        let settings: Settings =
+            toml::from_str("schema_version = 1\n[shell]\n[hotkeys]\n[capture]\n").unwrap();
+
+        assert_eq!(settings.popup, PopupSettings::default());
+        assert_eq!(settings.mini_window, MiniWindowSettings::default());
+        assert!(settings.popup.logical_width > 0);
+        assert!(settings.popup.logical_height > 0);
+        assert!(settings.mini_window.logical_width > 0);
+        assert!(settings.mini_window.logical_height > 0);
+        assert!(!settings.popup.pinned);
+        assert!(!settings.popup.auto_pronounce);
+        assert!(!settings.mini_window.always_visible);
+        assert!(!settings.mini_window.roll_up);
     }
 
     #[test]

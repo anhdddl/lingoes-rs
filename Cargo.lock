@@ -2370,6 +2370,7 @@ dependencies = [
  "lingoes-platform",
  "lingoes-translator",
  "lingoes-tts",
+ "raw-window-handle",
  "slint",
  "slint-build",
  "tempfile",
@@ -4030,6 +4031,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "pin-weak",
+ "raw-window-handle",
  "slint-macros",
  "vtable",
 ]

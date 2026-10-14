@@ -17,7 +17,11 @@ use lingoes_platform::settings::{
 };
 use lingoes_translator::{GoogleTranslator, OpenAiTranslator, Translator};
 use lingoes_tts::{SystemTtsEngine, TtsEngine};
-use slint::{ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+
+use popup::{PopupContent, PopupController, PopupState};
+
+pub mod popup;
 
 slint::include_modules!();
 
@@ -64,9 +68,7 @@ pub struct DesktopApp {
     tts: Arc<dyn TtsEngine>,
     status: String,
     has_error: bool,
-    quick_popup_word: String,
-    quick_popup_def: String,
-    show_quick_popup: bool,
+    popup: PopupController,
     #[cfg(not(windows))]
     clipboard_running: Option<Arc<AtomicBool>>,
     #[cfg(windows)]
@@ -106,9 +108,7 @@ impl DesktopApp {
             tts,
             status: "Sẵn sàng".into(),
             has_error: false,
-            quick_popup_word: String::new(),
-            quick_popup_def: String::new(),
-            show_quick_popup: false,
+            popup: PopupController::new(),
             #[cfg(not(windows))]
             clipboard_running: None,
             #[cfg(windows)]
@@ -128,6 +128,7 @@ impl DesktopApp {
     }
 
     pub fn set_settings(&mut self, settings: Settings) {
+        self.popup.set_preferred_pinned(settings.popup.pinned);
         self.settings = settings;
     }
 
@@ -383,30 +384,60 @@ impl DesktopApp {
         if trimmed.is_empty() {
             return;
         }
+        let token = self.popup.begin_capture();
         self.search(trimmed);
-        if let Some(entry) = self.selected_entry() {
-            let headword = entry.headword().to_string();
-            let definition = entry.definition().to_string();
-            self.quick_popup_word = headword;
-            self.quick_popup_def = definition;
-            self.show_quick_popup = true;
-        }
+        let content = self.selected_entry().map(|entry| {
+            PopupContent::new(entry.headword().to_string(), entry.definition().to_string())
+        });
+        let _ = self.popup.complete_capture(token, content);
     }
 
     pub fn show_quick_popup(&self) -> bool {
-        self.show_quick_popup
+        matches!(
+            self.popup.state(),
+            PopupState::VisibleTransient | PopupState::Pinned | PopupState::Expanded
+        )
     }
 
     pub fn quick_popup_word(&self) -> &str {
-        &self.quick_popup_word
+        self.popup
+            .content()
+            .map_or("", |content| content.headword())
     }
 
     pub fn quick_popup_def(&self) -> &str {
-        &self.quick_popup_def
+        self.popup
+            .content()
+            .map_or("", |content| content.definition())
     }
 
     pub fn dismiss_quick_popup(&mut self) {
-        self.show_quick_popup = false;
+        self.popup.close();
+    }
+
+    pub fn pin_quick_popup(&mut self, pinned: bool) {
+        if pinned {
+            self.popup.pin();
+        } else {
+            self.popup.unpin();
+        }
+        self.settings.popup.pinned = pinned;
+    }
+
+    pub fn expand_quick_popup(&mut self, expanded: bool) {
+        if expanded {
+            self.popup.expand();
+        } else {
+            self.popup.collapse();
+        }
+    }
+
+    pub fn quick_popup_state(&self) -> PopupState {
+        self.popup.state()
+    }
+
+    pub fn quick_popup_is_pinned(&self) -> bool {
+        self.popup.is_pinned()
     }
 
     pub fn is_clipboard_monitoring(&self) -> bool {
@@ -475,6 +506,9 @@ pub fn launch_gui() -> Result<(), AppError> {
     desktop_app.set_settings(settings);
     let application = Arc::new(Mutex::new(desktop_app));
     let window = AppWindow::new().map_err(|error| AppError(error.to_string()))?;
+    let popup_window = PopupWindow::new().map_err(|error| AppError(error.to_string()))?;
+    #[cfg(windows)]
+    let _popup_native = materialize_windows_popup(&popup_window)?;
 
     // Search callback
     {
@@ -676,6 +710,131 @@ pub fn launch_gui() -> Result<(), AppError> {
         });
     }
 
+    // Standalone quick-lookup popup callbacks.
+    {
+        let application = Arc::clone(&application);
+        let popup_weak = popup_window.as_weak();
+        popup_window.window().on_close_requested(move || {
+            application.lock().unwrap().dismiss_quick_popup();
+            if let Some(popup) = popup_weak.upgrade() {
+                update_popup_window(&popup, &application.lock().unwrap());
+            }
+            slint::CloseRequestResponse::KeepWindowShown
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let popup_weak = popup_window.as_weak();
+        popup_window.on_close(move || {
+            application.lock().unwrap().dismiss_quick_popup();
+            if let Some(popup) = popup_weak.upgrade() {
+                update_popup_window(&popup, &application.lock().unwrap());
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let popup_weak = popup_window.as_weak();
+        popup_window.on_pin(move |pinned| {
+            application.lock().unwrap().pin_quick_popup(pinned);
+            if let Some(popup) = popup_weak.upgrade() {
+                update_popup_window(&popup, &application.lock().unwrap());
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let popup_weak = popup_window.as_weak();
+        popup_window.on_expand(move |expanded| {
+            application.lock().unwrap().expand_quick_popup(expanded);
+            if let Some(popup) = popup_weak.upgrade() {
+                update_popup_window(&popup, &application.lock().unwrap());
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let popup_weak = popup_window.as_weak();
+        let window_weak = window.as_weak();
+        popup_window.on_previous(move || {
+            let mut app = application.lock().unwrap();
+            let index = app.selected_index().unwrap_or(0).saturating_sub(1);
+            app.select(index);
+            let token = app.popup.begin_capture();
+            let content = app.selected_entry().map(|entry| {
+                PopupContent::new(entry.headword().to_owned(), entry.definition().to_owned())
+            });
+            let _ = app.popup.complete_capture(token, content);
+            if let Some(main) = window_weak.upgrade() {
+                update_window(&main, &app);
+            }
+            if let Some(popup) = popup_weak.upgrade() {
+                update_popup_window(&popup, &app);
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let popup_weak = popup_window.as_weak();
+        let window_weak = window.as_weak();
+        popup_window.on_next(move || {
+            let mut app = application.lock().unwrap();
+            let index = app
+                .selected_index()
+                .map_or(0, |index| index.saturating_add(1));
+            if index < app.results().len() {
+                app.select(index);
+                let token = app.popup.begin_capture();
+                let content = app.selected_entry().map(|entry| {
+                    PopupContent::new(entry.headword().to_owned(), entry.definition().to_owned())
+                });
+                let _ = app.popup.complete_capture(token, content);
+            }
+            if let Some(main) = window_weak.upgrade() {
+                update_window(&main, &app);
+            }
+            if let Some(popup) = popup_weak.upgrade() {
+                update_popup_window(&popup, &app);
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let popup_weak = popup_window.as_weak();
+        popup_window.on_copy(move || {
+            let text = application.lock().unwrap().quick_popup_def().to_owned();
+            let _ = application.lock().unwrap().copy_to_clipboard(&text);
+            if let Some(popup) = popup_weak.upgrade() {
+                update_popup_window(&popup, &application.lock().unwrap());
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        popup_window.on_speak(move || {
+            let word = application.lock().unwrap().quick_popup_word().to_owned();
+            let _ = application.lock().unwrap().speak(&word, "en");
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let popup_weak = popup_window.as_weak();
+        let window_weak = window.as_weak();
+        popup_window.on_open_main(move || {
+            let query = application.lock().unwrap().quick_popup_word().to_owned();
+            application.lock().unwrap().dismiss_quick_popup();
+            if let Some(main) = window_weak.upgrade() {
+                main.set_active_tab(0);
+                main.set_query(query.clone().into());
+                main.invoke_search(query.into());
+                let _ = main.show();
+            }
+            if let Some(popup) = popup_weak.upgrade() {
+                update_popup_window(&popup, &application.lock().unwrap());
+            }
+        });
+    }
+
     // Capture mode settings feed all captured text through handle_captured_text.
     {
         let application = Arc::clone(&application);
@@ -694,22 +853,11 @@ pub fn launch_gui() -> Result<(), AppError> {
         });
     }
 
-    // Dismiss quick popup callback
-    {
-        let application = Arc::clone(&application);
-        let window_weak = window.as_weak();
-        window.on_dismiss_quick_popup(move || {
-            application.lock().unwrap().dismiss_quick_popup();
-            if let Some(window) = window_weak.upgrade() {
-                update_window(&window, &application.lock().unwrap());
-            }
-        });
-    }
-
     // Toggle clipboard monitor callback
     {
         let application = Arc::clone(&application);
         let window_weak = window.as_weak();
+        let popup_weak = popup_window.as_weak();
         window.on_toggle_clipboard_monitor(move |enabled| {
             if enabled {
                 #[cfg(not(windows))]
@@ -724,15 +872,20 @@ pub fn launch_gui() -> Result<(), AppError> {
 
                     let app_for_thread = Arc::clone(&application);
                     let win_for_thread = window_weak.clone();
+                    let popup_for_thread = popup_weak.clone();
 
                     std::thread::spawn(move || {
                         while let Ok(text) = rx.recv() {
                             let app_capture = Arc::clone(&app_for_thread);
                             let win_capture = win_for_thread.clone();
+                            let popup_capture = popup_for_thread.clone();
                             let _ = slint::invoke_from_event_loop(move || {
                                 app_capture.lock().unwrap().handle_captured_text(&text);
                                 if let Some(w) = win_capture.upgrade() {
                                     update_window(&w, &app_capture.lock().unwrap());
+                                }
+                                if let Some(popup) = popup_capture.upgrade() {
+                                    update_popup_window(&popup, &app_capture.lock().unwrap());
                                 }
                             });
                         }
@@ -746,16 +899,21 @@ pub fn launch_gui() -> Result<(), AppError> {
                     let source = Arc::clone(&reader);
                     let app_for_event = Arc::clone(&application);
                     let win_for_event = window_weak.clone();
+                    let popup_for_event = popup_weak.clone();
                     if let Ok(listener) = lingoes_capture::windows::WindowsClipboardListener::spawn(
                         Duration::from_millis(300),
                         move || source.lock().ok()?.get_text().ok(),
                         move |text| {
                             let app_capture = Arc::clone(&app_for_event);
                             let win_capture = win_for_event.clone();
+                            let popup_capture = popup_for_event.clone();
                             let _ = slint::invoke_from_event_loop(move || {
                                 app_capture.lock().unwrap().handle_captured_text(&text);
                                 if let Some(window) = win_capture.upgrade() {
                                     update_window(&window, &app_capture.lock().unwrap());
+                                }
+                                if let Some(popup) = popup_capture.upgrade() {
+                                    update_popup_window(&popup, &app_capture.lock().unwrap());
                                 }
                             });
                         },
@@ -776,7 +934,120 @@ pub fn launch_gui() -> Result<(), AppError> {
     }
 
     update_window(&window, &application.lock().unwrap());
-    window.run().map_err(|error| AppError(error.to_string()))
+    update_popup_window(&popup_window, &application.lock().unwrap());
+    let run_result = window.run().map_err(|error| AppError(error.to_string()));
+
+    let settings_result = settings_store
+        .save(application.lock().unwrap().settings())
+        .map_err(|error| AppError(format!("cannot save settings: {error}")));
+    run_result.and(settings_result)
+}
+
+#[cfg(windows)]
+fn materialize_windows_popup(
+    popup: &PopupWindow,
+) -> Result<lingoes_platform::windows::WindowsPopupWindowAdapter, AppError> {
+    // Slint 1.8 creates the backend HWND when the component is instantiated. Apply passive styles
+    // while it remains hidden so the first user-visible show cannot activate the popup.
+    let adapter = attach_windows_popup_adapter(popup)?;
+    adapter
+        .prepare(lingoes_platform::popup::PopupActivation::Passive)
+        .map_err(|error| AppError(error.to_string()))?;
+    adapter
+        .hide()
+        .map_err(|error| AppError(error.to_string()))?;
+    Ok(adapter)
+}
+
+#[cfg(windows)]
+fn attach_windows_popup_adapter(
+    popup: &PopupWindow,
+) -> Result<lingoes_platform::windows::WindowsPopupWindowAdapter, AppError> {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+
+    let handle = popup.window().window_handle();
+    let raw = handle
+        .window_handle()
+        .map_err(|error| AppError(format!("cannot get popup window handle: {error}")))?;
+    let hwnd = match raw.as_raw() {
+        RawWindowHandle::Win32(handle) => handle.hwnd.get(),
+        _ => {
+            return Err(AppError(
+                "popup backend did not provide a Win32 HWND".into(),
+            ));
+        }
+    };
+    lingoes_platform::windows::WindowsPopupWindowAdapter::from_raw(hwnd)
+        .map_err(|error| AppError(error.to_string()))
+}
+
+fn update_popup_window(window: &PopupWindow, application: &DesktopApp) {
+    window.set_headword(application.quick_popup_word().into());
+    window.set_definition(application.quick_popup_def().into());
+    window.set_dictionary_name(if application.quick_popup_word().is_empty() {
+        "".into()
+    } else {
+        "Lingoes DB".into()
+    });
+    window.set_status_text(application.status().into());
+    window.set_can_go_previous(application.selected_index().is_some_and(|index| index > 0));
+    window.set_can_go_next(
+        application
+            .selected_index()
+            .is_some_and(|index| index.saturating_add(1) < application.results().len()),
+    );
+    window.set_pinned(application.quick_popup_is_pinned());
+    window.set_expanded(application.quick_popup_state() == PopupState::Expanded);
+
+    if application.show_quick_popup() {
+        #[cfg(windows)]
+        if let Err(error) = show_windows_popup(window, application) {
+            eprintln!("cannot show native popup: {error}");
+        }
+        #[cfg(not(windows))]
+        let _ = window.show();
+    } else {
+        #[cfg(windows)]
+        if let Ok(adapter) = attach_windows_popup_adapter(window) {
+            let _ = adapter.hide();
+        }
+        let _ = window.hide();
+    }
+}
+
+#[cfg(windows)]
+fn show_windows_popup(window: &PopupWindow, application: &DesktopApp) -> Result<(), AppError> {
+    use lingoes_platform::popup::{
+        LogicalSize, PopupActivation, PopupPlacementRequest, place_popup,
+    };
+
+    let monitors =
+        lingoes_platform::windows::popup_monitors().map_err(|error| AppError(error.to_string()))?;
+    let cursor = lingoes_platform::windows::popup_cursor_position()
+        .map_err(|error| AppError(error.to_string()))?;
+    let (logical_width, logical_height) = if application.quick_popup_state() == PopupState::Expanded
+    {
+        (560.0, 480.0)
+    } else {
+        (
+            f64::from(application.settings().popup.logical_width.max(320)),
+            f64::from(application.settings().popup.logical_height.max(180)),
+        )
+    };
+    let placement = place_popup(
+        PopupPlacementRequest {
+            bounds: None,
+            cursor,
+            logical_size: LogicalSize::new(logical_width, logical_height),
+            selected_monitor: None,
+        },
+        &monitors,
+    )
+    .ok_or_else(|| AppError("no monitor is available for popup placement".into()))?;
+    let adapter = attach_windows_popup_adapter(window)?;
+    adapter
+        .show(PopupActivation::Passive, placement.rect)
+        .map_err(|error| AppError(error.to_string()))
 }
 
 fn update_window(window: &AppWindow, application: &DesktopApp) {
@@ -823,9 +1094,6 @@ fn update_window(window: &AppWindow, application: &DesktopApp) {
         CaptureModeSetting::SelectedText
     ));
     window.set_ocr_fallback_enabled(application.settings().capture.ocr_enabled);
-    window.set_show_quick_popup(application.show_quick_popup());
-    window.set_quick_popup_headword(application.quick_popup_word().into());
-    window.set_quick_popup_definition(application.quick_popup_def().into());
 
     window.set_status_text(application.status().into());
     window.set_status_is_error(application.has_error());
