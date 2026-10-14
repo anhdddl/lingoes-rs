@@ -62,6 +62,17 @@ component CircleNavButton inherits Rectangle {
     }
 }
 
+component BookIcon inherits Rectangle {
+    width: 15px;
+    height: 13px;
+    background: transparent;
+    Rectangle { x: 1px; y: 2px; width: 6px; height: 9px; background: #f8fbfd; border-color: #4f7899; border-width: 1px; border-radius: 1px; }
+    Rectangle { x: 8px; y: 2px; width: 6px; height: 9px; background: #f8fbfd; border-color: #4f7899; border-width: 1px; border-radius: 1px; }
+    Rectangle { x: 7px; y: 1px; width: 1px; height: 11px; background: #4f7899; }
+    Rectangle { x: 3px; y: 4px; width: 3px; height: 1px; background: #a9bfd0; }
+    Rectangle { x: 9px; y: 4px; width: 3px; height: 1px; background: #a9bfd0; }
+}
+
 component SearchActionButton inherits Rectangle {
     in property <string> text;
     in property <bool> enabled: true;
@@ -125,14 +136,14 @@ component TopTabButton inherits Rectangle {
 }
 component SectionTitle inherits Rectangle { in property <string> text; height: 27px; background: #d8e9f6; border-color: #9ebbd0; border-width: 1px; Text { text: root.text; x: 7px; width: parent.width - 14px; height: parent.height; color: #174d7b; font-family: "Tahoma"; font-size: 12px; font-weight: 700; vertical-alignment: center; } }
 export component AppWindow inherits Window {
- title: "Lingoes RS - Từ Điển & Dịch Thuật"; preferred-width: 960px; preferred-height: 660px; min-width: 780px; min-height: 500px; background: white;
+ title: "Lingoes RS - Dictionary and Text Translation"; preferred-width: 860px; preferred-height: 650px; min-width: 730px; min-height: 500px; background: #fffdf0;
  in-out property <int> active-tab: 0;
  in-out property <string> query; in property <[SearchResult]> results; in property <int> selected-index: -1; in property <string> selected-headword; in property <string> selected-definition; in property <string> selected-dict-badge; in property <[FormattedEntryLine]> definition-lines: []; in property <bool> can-go-back: false; in property <bool> can-go-forward: false; in-out property <bool> private-mode: false; in-out property <int> active-group-index: 0; in-out property <bool> show-history-tab: false; in property <[string]> history-items;
  in-out property <string> translate-source-text; in-out property <string> translate-target-text; in-out property <string> translate-from-lang: "auto"; in-out property <string> translate-to-lang: "vi"; in-out property <string> translate-engine: "google"; in property <bool> is-translating: false;
  in property <[DictionaryItem]> dictionaries; in-out property <string> import-path; in-out property <string> import-name;
  in-out property <bool> clipboard-monitor-enabled: false; in-out property <bool> cursor-capture-enabled: false; in-out property <bool> selection-capture-enabled: false; in-out property <bool> ocr-fallback-enabled: false; in-out property <string> openai-base-url: "http://localhost:20128/v1"; in-out property <string> openai-model: "auto"; in-out property <string> openai-api-key: ""; in-out property <string> default-target-lang: "vi";
  in property <string> status-text: "Sẵn sàng"; in property <bool> status-is-error: false; in-out property <bool> auto-pronounce-enabled: false;
- callback search(string); callback full-text-search(string); callback web-search(string, string); callback select-result(int); callback speak(string, string); callback stop-tts(); callback copy-to-clipboard(string); callback export-result-html(); callback translate(string, string, string, string); callback cancel-translation(); callback import-dictionary(string, string); callback toggle-dictionary(int, bool); callback delete-dictionary(int); callback toggle-clipboard-monitor(bool); callback toggle-auto-pronounce(bool); callback configure-capture(bool, bool, bool);
+ callback search(string); callback full-text-search(string); callback web-search(string, string); callback select-result(int); callback navigate-back(); callback navigate-forward(); callback speak(string, string); callback stop-tts(); callback copy-to-clipboard(string); callback export-result-html(); callback translate(string, string, string, string); callback cancel-translation(); callback import-dictionary(string, string); callback toggle-dictionary(int, bool); callback delete-dictionary(int); callback toggle-clipboard-monitor(bool); callback toggle-auto-pronounce(bool); callback configure-capture(bool, bool, bool);
  VerticalLayout { spacing: 0px;
   Rectangle { height: 28px; background: #2570ab;
    Rectangle { y: 0px; height: 1px; background: #68a7d7; }
@@ -171,51 +182,60 @@ export component AppWindow inherits Window {
   }
   Rectangle { height: 36px; background: #e2edf6; border-color: #9cb5c9; border-width: 1px;
    HorizontalLayout { padding: 4px; spacing: 4px;
-    CircleNavButton { text: "<"; enabled: root.can-go-back; }
-    CircleNavButton { text: ">"; enabled: root.can-go-forward; }
-    Rectangle { horizontal-stretch: 1; background: white; border-color: #729bbd; border-width: 1px; border-radius: 3px;
-     HorizontalLayout { padding-left: 6px; padding-right: 4px;
-      Text { text: "📖"; font-size: 11px; vertical-alignment: center; }
+    CircleNavButton { text: "‹"; enabled: root.can-go-back; clicked => { root.navigate-back(); } }
+    CircleNavButton { text: "›"; enabled: root.can-go-forward; clicked => { root.navigate-forward(); } }
+    Rectangle { horizontal-stretch: 1; background: white; border-color: #729bbd; border-width: 1px; border-radius: 2px;
+     HorizontalLayout { padding-left: 6px; padding-right: 2px; spacing: 4px;
+      BookIcon { }
       LineEdit { text <=> root.query; placeholder-text: "Type a word or phrase to look up..."; accepted => { root.search(self.text); } }
-      Rectangle { width: 18px; Text { text: "▾"; color: #50718d; horizontal-alignment: center; vertical-alignment: center; font-size: 10px; } }
+      Rectangle { width: 18px; background: #edf4fa; border-color: #b5c9d9; border-width: 1px; Text { text: "▾"; color: #50718d; horizontal-alignment: center; vertical-alignment: center; font-size: 9px; } TouchArea { clicked => { root.show-history-tab = true; } } }
      }
     }
-    SearchActionButton { text: "Search  >"; width: 76px; clicked => { root.search(root.query); } }
-    ClassicButton { text: "Web Search"; width: 76px; clicked => { root.web-search(root.query, "google"); } }
-    ClassicButton { text: "Text Translation"; width: 102px; clicked => { root.active-tab = 1; } }
-    ClassicButton { text: "Speak"; width: 48px; enabled: root.query != ""; clicked => { root.speak(root.query, "en"); } }
+    SearchActionButton { text: "▶"; width: 31px; clicked => { root.search(root.query); } }
+    ClassicButton { text: "Google"; width: 94px; clicked => { root.web-search(root.query, "google"); } }
+    CircleNavButton { text: "G"; enabled: root.query != ""; clicked => { root.web-search(root.query, "google"); } }
    }
   }
   Rectangle { vertical-stretch: 1; background: white;
    if root.active-tab == 0 : HorizontalLayout { spacing: 2px;
-    Rectangle { width: 236px; background: #eef5fa; border-color: #91aec3; border-width: 1px; VerticalLayout { spacing: 0px;
-     HorizontalLayout { height: 30px; spacing: 1px; ClassicButton { text: "Index"; selected: !root.show-history-tab && root.active-group-index == 0; clicked => { root.show-history-tab = false; root.active-group-index = 0; } } ClassicButton { text: "Guide"; selected: !root.show-history-tab && root.active-group-index == 1; clicked => { root.show-history-tab = false; root.active-group-index = 1; } } ClassicButton { text: "Appendix"; selected: !root.show-history-tab && root.active-group-index == 2; clicked => { root.show-history-tab = false; root.active-group-index = 2; } } ClassicButton { text: "History"; selected: root.show-history-tab; clicked => { root.show-history-tab = true; } } }
-     Rectangle { height: 3px; background: #55dd00; }
-     Rectangle { vertical-stretch: 1; background: white; border-color: #a8bbc9; border-width: 1px; if root.show-history-tab : ListView { for item in root.history-items : Rectangle { height: 23px; background: hhit.has-hover ? #f4f9fd : white; Text { text: item; x: 7px; width: parent.width - 14px; height: parent.height; color: #173f61; font-size: 12px; vertical-alignment: center; overflow: elide; } hhit := TouchArea { clicked => { root.query = item; root.search(item); } } } } if !root.show-history-tab : ListView { for result[index] in root.results : Rectangle { height: 25px; background: index == root.selected-index ? #cce7fa : rhit.has-hover ? #f4f9fd : white; border-color: #edf2f5; border-width: 1px; Text { text: result.headword; x: 7px; width: parent.width - 14px; height: parent.height; color: #173f61; font-size: 12px; vertical-alignment: center; overflow: elide; } rhit := TouchArea { clicked => { root.select-result(index); } } } } }
+    Rectangle { width: 164px; background: white; border-color: #b5cee3; border-width: 1px; HorizontalLayout { spacing: 0px;
+     Rectangle { width: 28px; background: #eaf3fa; border-color: #b5cee3; border-width: 1px; VerticalLayout { padding-top: 6px; spacing: 4px;
+      ClassicButton { text: "R"; width: 24px; height: 24px; selected: !root.show-history-tab; clicked => { root.show-history-tab = false; } }
+      ClassicButton { text: "H"; width: 24px; height: 24px; selected: root.show-history-tab; clicked => { root.show-history-tab = true; } }
+      ClassicButton { text: "T"; width: 24px; height: 24px; clicked => { root.active-tab = 1; } }
+      ClassicButton { text: "D"; width: 24px; height: 24px; clicked => { root.active-tab = 2; } }
+     } }
+     VerticalLayout { spacing: 0px;
+      SectionTitle { text: root.show-history-tab ? "History" : "Results"; height: 27px; }
+      Rectangle { vertical-stretch: 1; background: white; if root.show-history-tab : ListView { for item in root.history-items : Rectangle { height: 23px; background: hhit.has-hover ? #f4f9fd : white; Text { text: item; x: 7px; width: parent.width - 14px; height: parent.height; color: #173f61; font-family: "Tahoma"; font-size: 11px; vertical-alignment: center; overflow: elide; } hhit := TouchArea { clicked => { root.query = item; root.search(item); } } } } if !root.show-history-tab : ListView { for result[index] in root.results : Rectangle { height: 23px; background: index == root.selected-index ? #d9ecfa : rhit.has-hover ? #f4f9fd : white; border-color: #edf2f5; border-width: 1px; Text { text: result.headword; x: 7px; width: parent.width - 14px; height: parent.height; color: #173f61; font-family: "Tahoma"; font-size: 11px; vertical-alignment: center; overflow: elide; } rhit := TouchArea { clicked => { root.select-result(index); } } } } }
+      SectionTitle { text: "Options"; height: 27px; }
+      Rectangle { height: 75px; background: #f8fbfd; VerticalLayout { padding: 6px; spacing: 4px; Text { text: "Exact + prefix lookup"; font-family: "Tahoma"; font-size: 10px; color: #58758b; } Text { text: root.results.length + " matches"; font-family: "Tahoma"; font-size: 10px; color: #58758b; } } }
+     }
     } }
     Rectangle { horizontal-stretch: 1; background: #f5f8fa; border-color: #91aec3; border-width: 1px; VerticalLayout { spacing: 0px;
      Rectangle { height: 29px; background: #eef5fb; border-color: #b4cbe0; border-width: 1px; HorizontalLayout { padding-left: 8px; padding-right: 6px; spacing: 4px; Text { text: root.selected-headword == "" ? "Start Page" : root.selected-headword; color: #10385c; font-family: "Tahoma"; font-size: 15px; font-weight: 700; vertical-alignment: center; overflow: elide; } if root.selected-dict-badge != "" : Text { text: "[" + root.selected-dict-badge + "]"; color: #58758b; font-family: "Tahoma"; font-size: 11px; vertical-alignment: center; } Rectangle { horizontal-stretch: 1; } ClassicButton { text: "Speak"; width: 50px; height: 22px; enabled: root.selected-headword != ""; clicked => { root.speak(root.selected-headword, "en"); } } ClassicButton { text: "Stop"; width: 44px; height: 22px; clicked => { root.stop-tts(); } } ClassicButton { text: "Copy"; width: 46px; height: 22px; enabled: root.selected-headword != ""; clicked => { root.copy-to-clipboard(root.selected-headword + "\n" + root.selected-definition); } } ClassicButton { text: "Save"; width: 44px; height: 22px; enabled: root.selected-headword != ""; clicked => { root.export-result-html(); } } ClassicButton { text: "Find"; width: 42px; height: 22px; clicked => { root.full-text-search(root.query); } } } }
-     ScrollView { vertical-stretch: 1; Rectangle { background: #f5f8fa; min-height: 480px;
-      if root.selected-headword != "" : Rectangle { x: 8px; y: 8px; width: parent.width - 16px; background: white; border-color: #b9d2e7; border-width: 1px; border-radius: 4px;
+     Rectangle { vertical-stretch: 1; background: #fffdf0; ScrollView { VerticalLayout { padding: 8px; spacing: 8px;
+      if root.selected-headword != "" : Rectangle { background: #fffef8; border-color: #b9d2e7; border-width: 1px; border-radius: 2px;
        VerticalLayout { spacing: 0px;
-        Rectangle { height: 26px; background: #dbe9f6; border-top-left-radius: 4px; border-top-right-radius: 4px; border-color: #b9d2e7; border-width: 1px; HorizontalLayout { padding-left: 8px; padding-right: 8px; spacing: 6px; Text { text: "📖"; font-size: 11px; vertical-alignment: center; } Text { text: root.selected-dict-badge != "" ? root.selected-dict-badge : "Dictionary"; color: #174d7b; font-family: "Tahoma"; font-size: 11px; font-weight: 700; vertical-alignment: center; } Rectangle { horizontal-stretch: 1; } Text { text: "▾"; color: #58758b; font-size: 11px; vertical-alignment: center; } } }
-        VerticalLayout { padding: 14px; spacing: 5px;
+        Rectangle { height: 23px; background: #dcebf8; border-top-left-radius: 2px; border-top-right-radius: 2px; border-color: #9fbbd4; border-width: 1px; HorizontalLayout { padding-left: 7px; padding-right: 7px; spacing: 6px; BookIcon { } Text { text: root.selected-dict-badge != "" ? root.selected-dict-badge : "Dictionary"; color: #174d7b; font-family: "Tahoma"; font-size: 11px; font-weight: 700; vertical-alignment: center; overflow: elide; } Rectangle { horizontal-stretch: 1; } Text { text: "⌃"; color: #58758b; font-size: 10px; vertical-alignment: center; } } }
+        VerticalLayout { padding-left: 18px; padding-right: 14px; padding-top: 10px; padding-bottom: 14px; spacing: 4px;
          for line in root.definition-lines : HorizontalLayout { spacing: 6px;
-          if line.kind == "headword" : Text { text: line.body; font-family: "Tahoma"; font-size: 18px; font-weight: 700; color: #102a43; }
-          if line.kind == "phonetic" : Text { text: line.body; font-family: "Tahoma"; font-size: 13px; font-weight: 600; color: #1b5e20; }
-          if line.kind == "pos" : Text { text: line.body; font-family: "Tahoma"; font-size: 12px; font-weight: 700; color: #b71c1c; }
-          if line.kind == "section" : Text { text: line.body; font-family: "Tahoma"; font-size: 12px; font-weight: 700; color: #1565c0; }
-          if line.kind == "sense" : HorizontalLayout { spacing: 6px; if line.prefix != "" : Text { text: line.prefix; font-family: "Tahoma"; font-size: 12px; font-weight: 700; color: #00695c; width: 22px; } Text { text: line.body; font-family: "Tahoma"; font-size: 12px; color: #212529; wrap: word-wrap; horizontal-stretch: 1; } }
-          if line.kind == "example" : HorizontalLayout { padding-left: 14px; spacing: 6px; Text { text: "▸"; font-size: 11px; color: #1976d2; } Text { text: line.body; font-family: "Tahoma"; font-size: 12px; font-italic: true; color: #37474f; wrap: word-wrap; horizontal-stretch: 1; } }
-          if line.kind == "bullet" : HorizontalLayout { padding-left: 14px; spacing: 6px; Text { text: "•"; font-size: 11px; color: #78909c; } Text { text: line.body; font-family: "Tahoma"; font-size: 12px; color: #455a64; wrap: word-wrap; horizontal-stretch: 1; } }
-          if line.kind == "normal" : Text { text: line.body; font-family: "Tahoma"; font-size: 12px; color: #263238; wrap: word-wrap; }
+          if line.kind == "headword" : Text { text: line.body; font-family: "Tahoma"; font-size: 15px; font-weight: 700; color: #102a43; }
+          if line.kind == "phonetic" : Text { text: line.body; font-family: "Tahoma"; font-size: 12px; color: #2c9a28; }
+          if line.kind == "pos" : HorizontalLayout { spacing: 5px; Text { text: line.prefix; color: #d74e3a; font-size: 9px; vertical-alignment: center; } Text { text: line.body; font-family: "Tahoma"; font-size: 11px; font-italic: true; color: #d74e3a; } }
+          if line.kind == "section" : HorizontalLayout { spacing: 5px; Text { text: line.prefix; color: #3d76a5; font-size: 9px; vertical-alignment: center; } Text { text: line.body; font-family: "Tahoma"; font-size: 11px; font-weight: 700; color: #245f91; } }
+          if line.kind == "sense" : HorizontalLayout { spacing: 5px; if line.prefix != "" : Text { text: line.prefix; font-family: "Tahoma"; font-size: 11px; font-weight: 700; color: #168a82; min-width: 18px; } Text { text: line.body; font-family: "Tahoma"; font-size: 11px; color: #202020; wrap: word-wrap; horizontal-stretch: 1; } }
+          if line.kind == "example" : HorizontalLayout { padding-left: 12px; spacing: 5px; Text { text: line.prefix; font-size: 10px; color: #397fb7; } Text { text: line.body; font-family: "Tahoma"; font-size: 11px; font-italic: true; color: #555555; wrap: word-wrap; horizontal-stretch: 1; } }
+          if line.kind == "bullet" : HorizontalLayout { padding-left: 12px; spacing: 5px; Text { text: line.prefix; font-size: 10px; color: #78909c; } Text { text: line.body; font-family: "Tahoma"; font-size: 11px; color: #455a64; wrap: word-wrap; horizontal-stretch: 1; } }
+          if line.kind != "headword" && line.kind != "phonetic" && line.kind != "pos" && line.kind != "section" && line.kind != "sense" && line.kind != "example" && line.kind != "bullet" : Text { text: line.body; font-family: "Tahoma"; font-size: 11px; color: #263238; wrap: word-wrap; }
          }
-         if root.definition-lines.length == 0 : Text { text: root.selected-definition; font-family: "Tahoma"; font-size: 13px; color: #172f43; wrap: word-wrap; }
+         if root.definition-lines.length == 0 : Text { text: root.selected-definition; font-family: "Tahoma"; font-size: 11px; color: #172f43; wrap: word-wrap; }
         }
        }
       }
-      if root.selected-headword == "" : Rectangle { x: 8px; y: 8px; width: parent.width - 16px; background: white; border-color: #b9d2e7; border-width: 1px; border-radius: 4px; VerticalLayout { padding: 18px; spacing: 10px; Text { text: "Welcome to Lingoes RS"; font-family: "Tahoma"; font-size: 16px; font-weight: 700; color: #174d7b; } Text { text: "Enter a word or phrase in the search box above, then press Enter or click Search.\n\nYou can also explore the Index list on the left sidebar or import additional StarDict dictionaries in the Dictionaries tab."; font-family: "Tahoma"; font-size: 13px; color: #45637d; wrap: word-wrap; } } }
-     } }
+      if root.selected-headword == "" : Rectangle { background: #fffef8; border-color: #b9d2e7; border-width: 1px; border-radius: 2px; VerticalLayout { padding: 18px; spacing: 10px; Text { text: "Welcome to Lingoes RS"; font-family: "Tahoma"; font-size: 15px; font-weight: 700; color: #174d7b; } Text { text: "Enter a word or phrase in the search box above, then press Enter or click Search.\n\nUse Results or History on the left, and manage additional StarDict dictionaries from the Dictionaries tab."; font-family: "Tahoma"; font-size: 11px; color: #45637d; wrap: word-wrap; } } }
+      Rectangle { vertical-stretch: 1; background: transparent; }
+     } } }
     } }
    }
    if root.active-tab == 1 : VerticalLayout { padding: 6px; spacing: 5px; SectionTitle { text: "Text Translation"; } HorizontalLayout { height: 27px; spacing: 5px; Text { text: "From:"; width: 35px; color: #174d7b; } LineEdit { width: 75px; text <=> root.translate-from-lang; } Text { text: "To:"; width: 20px; } LineEdit { width: 75px; text <=> root.translate-to-lang; } Text { text: "Engine:"; width: 45px; } LineEdit { width: 110px; text <=> root.translate-engine; } Rectangle { horizontal-stretch: 1; } ClassicButton { text: root.is-translating ? "Cancel" : "Translate"; width: 78px; clicked => { if root.is-translating { root.cancel-translation(); } else { root.translate(root.translate-source-text, root.translate-from-lang, root.translate-to-lang, root.translate-engine); } } } } HorizontalLayout { spacing: 5px; vertical-stretch: 1; Rectangle { horizontal-stretch: 1; border-color: #91aec3; border-width: 1px; VerticalLayout { spacing: 0px; SectionTitle { text: "Source Text"; } TextEdit { text <=> root.translate-source-text; vertical-stretch: 1; } } } Rectangle { horizontal-stretch: 1; border-color: #91aec3; border-width: 1px; VerticalLayout { spacing: 0px; HorizontalLayout { height: 27px; Text { text: "Translation"; color: #174d7b; font-weight: 700; } Rectangle { horizontal-stretch: 1; } ClassicButton { text: "Speak"; clicked => { root.speak(root.translate-target-text, root.translate-to-lang); } } ClassicButton { text: "Stop"; clicked => { root.stop-tts(); } } ClassicButton { text: "Copy"; clicked => { root.copy-to-clipboard(root.translate-target-text); } } } TextEdit { text <=> root.translate-target-text; vertical-stretch: 1; } } } } }

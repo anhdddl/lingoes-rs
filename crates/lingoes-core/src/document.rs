@@ -837,10 +837,55 @@ pub fn strip_tags(html: &str) -> String {
     out
 }
 
+fn decode_html_entities(raw: &str) -> String {
+    let chars: Vec<char> = raw.chars().collect();
+    let mut output = String::with_capacity(raw.len());
+    let mut index = 0;
+    while index < chars.len() {
+        if chars[index] != '&' {
+            output.push(chars[index]);
+            index += 1;
+            continue;
+        }
+        let Some(relative_end) = chars[index..].iter().position(|ch| *ch == ';') else {
+            output.push('&');
+            index += 1;
+            continue;
+        };
+        let end = index + relative_end;
+        let entity: String = chars[index + 1..end].iter().collect();
+        let decoded = match entity.as_str() {
+            "nbsp" => Some(' '),
+            "amp" => Some('&'),
+            "quot" => Some('"'),
+            "apos" | "#39" => Some('\''),
+            "lt" => Some('<'),
+            "gt" => Some('>'),
+            "bull" => Some('•'),
+            _ if entity.starts_with("#x") || entity.starts_with("#X") => {
+                u32::from_str_radix(&entity[2..], 16)
+                    .ok()
+                    .and_then(char::from_u32)
+            }
+            _ if entity.starts_with('#') => entity[1..].parse().ok().and_then(char::from_u32),
+            _ => None,
+        };
+        if let Some(character) = decoded {
+            output.push(character);
+        } else {
+            output.extend(chars[index..=end].iter());
+        }
+        index = end + 1;
+    }
+    output
+}
+
 /// Formats raw dictionary HTML into clean, human-readable plain text with appropriate line breaks and unescaped entities for display widgets.
 pub fn format_definition_for_display(raw: &str) -> String {
+    let decoded = decode_html_entities(raw);
+    let raw = decoded.as_str();
     if !raw.contains('<') || !raw.contains('>') {
-        return raw.to_string();
+        return decoded;
     }
 
     let mut result = String::with_capacity(raw.len());
@@ -926,105 +971,189 @@ pub fn format_definition_for_display(raw: &str) -> String {
 /// A structured line formatted for desktop card-style dictionary display.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct FormattedLine {
-    pub kind: String, // "headword", "phonetic", "pos", "section", "sense", "example", "bullet", "normal"
-    pub prefix: String, // e.g. "1.", "▸", "•"
+    pub kind: String,
+    pub prefix: String,
     pub body: String,
 }
 
-/// Parses a definition string (HTML or plain text) into structured lines with semantic classification for rich card rendering.
-pub fn parse_formatted_lines(raw: &str) -> Vec<FormattedLine> {
-    let plain = format_definition_for_display(raw);
-    let mut lines = Vec::new();
-
-    for line in plain.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        if let Some(pos) = trimmed.find(" — /") {
-            let (head, rest) = trimmed.split_at(pos);
-            let phon = rest.trim_start_matches(" — ").trim();
-            lines.push(FormattedLine {
-                kind: "headword".into(),
-                prefix: String::new(),
-                body: head.trim().into(),
-            });
-            lines.push(FormattedLine {
-                kind: "phonetic".into(),
-                prefix: String::new(),
-                body: phon.into(),
-            });
-        } else if trimmed.starts_with('/') && trimmed.ends_with('/') {
-            lines.push(FormattedLine {
-                kind: "phonetic".into(),
-                prefix: String::new(),
-                body: trimmed.into(),
-            });
-        } else if trimmed.starts_with('■') {
-            if trimmed.contains("đồng nghĩa")
-                || trimmed.contains("liên quan")
-                || trimmed.contains("nguồn gốc")
-                || trimmed.contains("synonym")
-                || trimmed.contains("antonym")
-            {
-                lines.push(FormattedLine {
-                    kind: "section".into(),
-                    prefix: String::new(),
-                    body: trimmed.into(),
-                });
-            } else {
-                lines.push(FormattedLine {
-                    kind: "pos".into(),
-                    prefix: String::new(),
-                    body: trimmed.into(),
-                });
-            }
-        } else if let Some(stripped) = trimmed
-            .strip_prefix('▸')
-            .or_else(|| trimmed.strip_prefix('‣'))
-        {
-            lines.push(FormattedLine {
-                kind: "example".into(),
-                prefix: "▸".into(),
-                body: stripped.trim().into(),
-            });
-        } else if let Some(stripped) = trimmed.strip_prefix('•') {
-            lines.push(FormattedLine {
-                kind: "bullet".into(),
-                prefix: "•".into(),
-                body: stripped.trim().into(),
-            });
-        } else if let Some((prefix, body)) = try_split_numbered_sense(trimmed) {
-            lines.push(FormattedLine {
-                kind: "sense".into(),
-                prefix,
-                body,
-            });
-        } else {
-            lines.push(FormattedLine {
-                kind: "normal".into(),
-                prefix: String::new(),
-                body: trimmed.into(),
-            });
+impl FormattedLine {
+    pub fn new(
+        kind: impl Into<String>,
+        prefix: impl Into<String>,
+        body: impl Into<String>,
+    ) -> Self {
+        Self {
+            kind: kind.into(),
+            prefix: prefix.into(),
+            body: body.into(),
         }
     }
+}
 
+/// Parses native Lingoes M/U/Q/Z markup in source order, then falls back to
+/// conservative plain-text classification for StarDict and MDict entries.
+pub fn parse_formatted_lines(raw: &str) -> Vec<FormattedLine> {
+    let native = parse_native_lingoes_lines(raw);
+    if !native.is_empty() {
+        return native;
+    }
+
+    format_definition_for_display(raw)
+        .lines()
+        .flat_map(classify_display_line)
+        .collect()
+}
+
+fn parse_native_lingoes_lines(raw: &str) -> Vec<FormattedLine> {
+    let lower = raw.to_lowercase();
+    let mut lines = Vec::new();
+    let mut cursor = 0;
+    let mut sense_number = 1;
+
+    while let Some(relative) = lower[cursor..].find('<') {
+        let start = cursor + relative;
+        let Some(close_bracket) = lower[start..].find('>') else {
+            break;
+        };
+        let open_end = start + close_bracket + 1;
+        let tag = lower[start + 1..open_end - 1]
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .trim_matches('/');
+        let kind = match tag {
+            "m" => Some(("phonetic", "")),
+            "u" => Some(("pos", "■")),
+            "q" => Some(("sense", "")),
+            "z" => Some(("example", "▸")),
+            _ => None,
+        };
+
+        if let Some((kind, fixed_prefix)) = kind {
+            let closing = format!("</{tag}>");
+            if let Some(relative_end) = lower[open_end..].find(&closing) {
+                let content_end = open_end + relative_end;
+                let body = format_definition_for_display(&raw[open_end..content_end]);
+                let body = body.trim();
+                if !body.is_empty() {
+                    let prefix = if tag == "q" {
+                        let prefix = format!("{sense_number}.");
+                        sense_number += 1;
+                        prefix
+                    } else {
+                        fixed_prefix.to_string()
+                    };
+                    lines.push(FormattedLine::new(kind, prefix, body));
+                }
+                cursor = content_end + closing.len();
+                continue;
+            }
+        }
+        cursor = open_end;
+    }
     lines
+}
+
+fn classify_display_line(line: &str) -> Vec<FormattedLine> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    if let Some(pos) = trimmed.find(" — /") {
+        let (head, rest) = trimmed.split_at(pos);
+        let phonetic = rest.trim_start_matches(" — ").trim();
+        return vec![
+            FormattedLine::new("headword", "", head.trim()),
+            FormattedLine::new("phonetic", "", phonetic),
+        ];
+    }
+    if trimmed.starts_with('/') && trimmed.ends_with('/') {
+        return vec![FormattedLine::new("phonetic", "", trimmed)];
+    }
+    if let Some(body) = trimmed.strip_prefix('■') {
+        let body = body.trim();
+        let normalized = body.to_lowercase();
+        let kind = if is_part_of_speech(&normalized) {
+            "pos"
+        } else {
+            "section"
+        };
+        return vec![FormattedLine::new(kind, "■", body)];
+    }
+    if let Some(body) = trimmed
+        .strip_prefix('▸')
+        .or_else(|| trimmed.strip_prefix('‣'))
+    {
+        return vec![FormattedLine::new("example", "▸", body.trim())];
+    }
+    if let Some(body) = trimmed.strip_prefix('•') {
+        return vec![FormattedLine::new("bullet", "•", body.trim())];
+    }
+    if let Some((prefix, body)) = try_split_numbered_sense(trimmed) {
+        return vec![FormattedLine::new("sense", prefix, body)];
+    }
+    vec![FormattedLine::new("normal", "", trimmed)]
+}
+
+fn is_part_of_speech(text: &str) -> bool {
+    const TOKENS: &[&str] = &[
+        "danh từ",
+        "động từ",
+        "tính từ",
+        "trạng từ",
+        "thán từ",
+        "đại từ",
+        "giới từ",
+        "liên từ",
+        "mạo từ",
+        "noun",
+        "verb",
+        "adjective",
+        "adverb",
+        "pronoun",
+        "preposition",
+        "conjunction",
+        "interjection",
+        "article",
+    ];
+    TOKENS
+        .iter()
+        .any(|token| text == *token || text.starts_with(&format!("{token} ")))
 }
 
 fn try_split_numbered_sense(text: &str) -> Option<(String, String)> {
     let bytes = text.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() && bytes[i].is_ascii_digit() {
-        i += 1;
+    if bytes.first() == Some(&b'(') {
+        let end = text.find(')')?;
+        if end > 1 && text[1..end].bytes().all(|byte| byte.is_ascii_digit()) {
+            return Some((text[..=end].to_string(), text[end + 1..].trim().to_string()));
+        }
     }
-    if i > 0 && i < bytes.len() && bytes[i] == b'.' {
-        let prefix = text[..=i].to_string();
-        let body = text[i + 1..].trim().to_string();
-        return Some((prefix, body));
+
+    let mut end = 0;
+    let mut seen_dot = false;
+    for (index, byte) in bytes.iter().copied().enumerate() {
+        if byte.is_ascii_digit() {
+            end = index + 1;
+        } else if byte == b'.'
+            && !seen_dot
+            && end > 0
+            && bytes.get(index + 1).is_some_and(u8::is_ascii_digit)
+        {
+            seen_dot = true;
+            end = index + 1;
+        } else {
+            break;
+        }
     }
-    None
+    let delimiter = bytes.get(end).copied()?;
+    if delimiter == b'.' || delimiter == b')' {
+        end += 1;
+    } else if !seen_dot {
+        return None;
+    }
+    let body = text[end..].trim();
+    (!body.is_empty()).then(|| (text[..end].to_string(), body.to_string()))
 }
 
 /// Generates a complete standalone HTML document with clean CSS styling, meta tags, and dictionary attribution header (IO-02).

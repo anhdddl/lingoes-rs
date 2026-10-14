@@ -273,44 +273,55 @@ fn dictionary_metadata_roundtrip_and_defaults() {
 
 #[test]
 fn test_parse_formatted_lines_classifies_semantic_elements() {
-    use lingoes_core::parse_formatted_lines;
+    use lingoes_core::{FormattedLine, parse_formatted_lines};
 
     let raw = r#"<div><b>hello</b> — /həˈləʊ/<br/><div><b>■ thán từ</b></div><div><b>1.&nbsp;</b>xin chào ↔ hello</div><div>‣&nbsp;Say hello to your aunt</div><div><b>■ đồng nghĩa/liên quan</b></div><div>•&nbsp;hallo — hullo</div></div>"#;
 
-    let lines = parse_formatted_lines(raw);
-    assert!(
-        lines
-            .iter()
-            .any(|l| l.kind == "headword" && l.body == "hello")
+    assert_eq!(
+        parse_formatted_lines(raw),
+        vec![
+            FormattedLine::new("headword", "", "hello"),
+            FormattedLine::new("phonetic", "", "/həˈləʊ/"),
+            FormattedLine::new("pos", "■", "thán từ"),
+            FormattedLine::new("sense", "1.", "xin chào ↔ hello"),
+            FormattedLine::new("example", "▸", "Say hello to your aunt"),
+            FormattedLine::new("section", "■", "đồng nghĩa/liên quan"),
+            FormattedLine::new("bullet", "•", "hallo — hullo"),
+        ]
     );
-    assert!(
-        lines
-            .iter()
-            .any(|l| l.kind == "phonetic" && l.body.contains("həˈləʊ"))
+}
+
+#[test]
+fn formatted_lines_preserve_native_lingoes_semantics_in_source_order() {
+    use lingoes_core::{FormattedLine, parse_formatted_lines};
+
+    let raw = "<M>/hə&#x2C8;ləʊ/</M><P><U>thán từ</U></P><Q>xin chào &amp; chào hỏi</Q><Z>Say hello&nbsp;to Long</Z><Q>alo</Q>";
+    assert_eq!(
+        parse_formatted_lines(raw),
+        vec![
+            FormattedLine::new("phonetic", "", "/həˈləʊ/"),
+            FormattedLine::new("pos", "■", "thán từ"),
+            FormattedLine::new("sense", "1.", "xin chào & chào hỏi"),
+            FormattedLine::new("example", "▸", "Say hello to Long"),
+            FormattedLine::new("sense", "2.", "alo"),
+        ]
     );
-    assert!(
-        lines
-            .iter()
-            .any(|l| l.kind == "pos" && l.body.contains("thán từ"))
-    );
-    assert!(
-        lines
-            .iter()
-            .any(|l| l.kind == "sense" && l.prefix == "1." && l.body.contains("xin chào"))
-    );
-    assert!(
-        lines
-            .iter()
-            .any(|l| l.kind == "example" && l.prefix == "▸" && l.body.contains("Say hello"))
-    );
-    assert!(
-        lines
-            .iter()
-            .any(|l| l.kind == "section" && l.body.contains("đồng nghĩa"))
-    );
-    assert!(
-        lines
-            .iter()
-            .any(|l| l.kind == "bullet" && l.prefix == "•" && l.body.contains("hallo"))
+}
+
+#[test]
+fn formatted_lines_handle_section_labels_and_number_styles_without_false_pos() {
+    use lingoes_core::{FormattedLine, parse_formatted_lines};
+
+    let raw = "■ Usage\n■ danh từ\n1) first\n(2) second\n1.1 nested\nv2026.10";
+    assert_eq!(
+        parse_formatted_lines(raw),
+        vec![
+            FormattedLine::new("section", "■", "Usage"),
+            FormattedLine::new("pos", "■", "danh từ"),
+            FormattedLine::new("sense", "1)", "first"),
+            FormattedLine::new("sense", "(2)", "second"),
+            FormattedLine::new("sense", "1.1", "nested"),
+            FormattedLine::new("normal", "", "v2026.10"),
+        ]
     );
 }

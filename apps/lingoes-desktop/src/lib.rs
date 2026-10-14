@@ -652,6 +652,52 @@ pub fn launch_gui_with_options(
         });
     }
 
+    // Navigate within the current ordered result set.
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_navigate_back(move || {
+            let mut app = application.lock().unwrap();
+            if let Some(index) = app.selected_index().filter(|index| *index > 0) {
+                app.select(index - 1);
+            }
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &app);
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_navigate_forward(move || {
+            let mut app = application.lock().unwrap();
+            if let Some(index) = app.selected_index() {
+                if index + 1 < app.results().len() {
+                    app.select(index + 1);
+                }
+            }
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &app);
+            }
+        });
+    }
+
+    // Launch a validated web-search URL through the platform adapter.
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_web_search(move |query, engine| {
+            let engine = (!engine.trim().is_empty()).then_some(engine.as_str());
+            let _ = application
+                .lock()
+                .unwrap()
+                .web_search(query.as_str(), engine);
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &application.lock().unwrap());
+            }
+        });
+    }
+
     // Import dictionary callback
     {
         let application = Arc::clone(&application);
@@ -1327,6 +1373,12 @@ fn update_window(window: &AppWindow, application: &DesktopApp) {
         application
             .selected_index()
             .map_or(-1, |index| index as i32),
+    );
+    window.set_can_go_back(application.selected_index().is_some_and(|index| index > 0));
+    window.set_can_go_forward(
+        application
+            .selected_index()
+            .is_some_and(|index| index + 1 < application.results().len()),
     );
     window.set_selected_headword(application.selected_headword().into());
     let formatted_def =
