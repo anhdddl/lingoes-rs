@@ -2,7 +2,19 @@ use std::time::Duration;
 
 fn main() {
     let arguments: Vec<_> = std::env::args().skip(1).collect();
-    if arguments.is_empty() {
+    if arguments.is_empty() || arguments[0] == "gui" || arguments[0] == "--gui" {
+        let initial_query =
+            if !arguments.is_empty() && (arguments[0] == "gui" || arguments[0] == "--gui") {
+                arguments.get(1).map(String::as_str)
+            } else {
+                None
+            };
+        let initial_popup =
+            if !arguments.is_empty() && (arguments[0] == "gui" || arguments[0] == "--gui") {
+                arguments.get(2).map(String::as_str)
+            } else {
+                None
+            };
         if let Ok(exe) = std::env::current_exe() {
             if let Ok(data_root) = lingoes_desktop::resolve_app_data_root(&exe) {
                 let endpoint =
@@ -10,7 +22,9 @@ fn main() {
                 match lingoes_platform::ipc::InstanceLock::acquire(endpoint.root(), endpoint.name())
                 {
                     Ok(lingoes_platform::ipc::InstanceLock::Primary(_guard)) => {
-                        if let Err(error) = lingoes_desktop::launch_gui() {
+                        if let Err(error) =
+                            lingoes_desktop::launch_gui_with_options(initial_query, initial_popup)
+                        {
                             eprintln!("{error}");
                             std::process::exit(2);
                         }
@@ -31,7 +45,7 @@ fn main() {
                 }
             }
         }
-        if let Err(error) = lingoes_desktop::launch_gui() {
+        if let Err(error) = lingoes_desktop::launch_gui_with_options(initial_query, initial_popup) {
             eprintln!("{error}");
             std::process::exit(2);
         }

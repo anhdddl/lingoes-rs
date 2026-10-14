@@ -543,6 +543,13 @@ pub fn resolve_database_path(data_root: &DataRoot) -> PathBuf {
 }
 
 pub fn launch_gui() -> Result<(), AppError> {
+    launch_gui_with_options(None, None)
+}
+
+pub fn launch_gui_with_options(
+    initial_query: Option<&str>,
+    show_popup_word: Option<&str>,
+) -> Result<(), AppError> {
     let executable = std::env::current_exe()
         .map_err(|error| AppError(format!("cannot locate executable: {error}")))?;
     let data_root = resolve_app_data_root(&executable)?;
@@ -1023,6 +1030,19 @@ pub fn launch_gui() -> Result<(), AppError> {
                 update_window(&window, &application.lock().unwrap());
             }
         });
+    }
+
+    if let Some(query) = initial_query {
+        let mut app = application.lock().unwrap();
+        app.search(query);
+        if !app.results().is_empty() {
+            app.select(0);
+        }
+        window.set_query(query.into());
+    }
+    if let Some(word) = show_popup_word {
+        let mut app = application.lock().unwrap();
+        app.handle_captured_text(word);
     }
 
     update_window(&window, &application.lock().unwrap());
