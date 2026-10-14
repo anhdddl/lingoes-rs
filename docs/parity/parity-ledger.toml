@@ -774,7 +774,7 @@ windows_scenarios = ["WIN-TTS-02"]
 supported_platforms = ["windows"]
 owner = "speech"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TTS-02 before setting verified."
-deviation = "Matrix identifies a partial baseline implementation; listed gaps remain and Windows runtime verification is NOT RUN."
+deviation = "PowerShell dependency has been eliminated. Windows backend uses native WinRT SpeechSynthesizer and MediaPlayer on a dedicated worker with Stop/Cancel and generation-based stale event filtering. Non-Windows platforms retain portable command fallbacks. Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -782,13 +782,13 @@ id = "TTS-03"
 workflow = "Voice, engine, volume, pitch, speed, and audio-format controls"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#TTS-03"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["TTS-03-ACCEPTANCE"]
 windows_scenarios = ["WIN-TTS-03"]
 supported_platforms = ["windows"]
 owner = "speech"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TTS-03 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Pure Rust/WinRT implementation supports voice enumeration, BCP-47 fallback, volume, pitch, and rate options with boundary validation. Audio-format profiles beyond native synthesizer formats remain unimplemented, and Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -796,13 +796,13 @@ id = "TTS-04"
 workflow = "Real-time pronunciation during query, cursor capture, and selected-text translation"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#TTS-04"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["TTS-04-ACCEPTANCE"]
 windows_scenarios = ["WIN-TTS-04"]
 supported_platforms = ["windows"]
 owner = "speech"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TTS-04 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Desktop quick-popup capture supports automatic pronunciation (auto_pronounce) via settings toggle. Query-as-you-type pronunciation and Windows runtime verification remain NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]

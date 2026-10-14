@@ -65,11 +65,14 @@ export component AppWindow inherits Window {
     in property <string> status-text: "Sẵn sàng";
     in property <bool> status-is-error: false;
 
+    in-out property <bool> auto-pronounce-enabled: false;
+
     // Callbacks
     callback search(string);
     callback full-text-search(string);
     callback select-result(int);
     callback speak(string, string);
+    callback stop-tts();
     callback copy-to-clipboard(string);
     callback export-result-html();
     callback translate(string, string, string, string);
@@ -77,6 +80,7 @@ export component AppWindow inherits Window {
     callback toggle-dictionary(int, bool);
     callback delete-dictionary(int);
     callback toggle-clipboard-monitor(bool);
+    callback toggle-auto-pronounce(bool);
     callback configure-capture(bool, bool, bool);
 
     VerticalLayout {
@@ -297,6 +301,10 @@ export component AppWindow inherits Window {
                                     clicked => { root.speak(root.selected-headword, "en"); }
                                 }
                                 if root.selected-headword != "" : Button {
+                                    text: "⏹ Dừng";
+                                    clicked => { root.stop-tts(); }
+                                }
+                                if root.selected-headword != "" : Button {
                                     text: "📋 Sao chép";
                                     clicked => {
                                         root.copy-to-clipboard(root.selected-headword + "\n" + root.selected-definition);
@@ -451,6 +459,10 @@ export component AppWindow inherits Window {
                             if root.translate-target-text != "" : Button {
                                 text: "🔊 Nghe";
                                 clicked => { root.speak(root.translate-target-text, root.translate-to-lang); }
+                            }
+                            if root.translate-target-text != "" : Button {
+                                text: "⏹ Dừng";
+                                clicked => { root.stop-tts(); }
                             }
                             if root.translate-target-text != "" : Button {
                                 text: "📋 Sao chép";
@@ -622,6 +634,11 @@ export component AppWindow inherits Window {
                             text: "Cho phép OCR dự phòng (chưa hỗ trợ trên bản dựng này)";
                             checked <=> root.ocr-fallback-enabled;
                             toggled => { root.configure-capture(root.cursor-capture-enabled, root.selection-capture-enabled, self.checked); }
+                        }
+                        CheckBox {
+                            text: "Tự động phát âm khi tra từ nhanh";
+                            checked <=> root.auto-pronounce-enabled;
+                            toggled => { root.toggle-auto-pronounce(self.checked); }
                         }
 
                         Text {

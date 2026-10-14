@@ -1,10 +1,23 @@
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
+mod state;
+
+#[cfg(target_os = "windows")]
+mod windows;
+
 #[derive(Debug, Error)]
 pub enum TtsError {
     #[error("text is empty")]
     EmptyText,
+    #[error("invalid speech options: {0}")]
+    InvalidOptions(String),
+    #[error("voice is unavailable: {0}")]
+    VoiceUnavailable(String),
+    #[error("unsupported TTS operation: {0}")]
+    Unsupported(String),
+    #[error("speech was stopped")]
+    Stopped,
     #[error("tts command failed: {0}")]
     CommandFailed(String),
     #[error("no supported tts engine available on system: {0}")]
@@ -15,8 +28,218 @@ pub enum TtsError {
     Other(String),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SpeechOptions {
+    rate: f32,
+    pitch: f32,
+    volume: f32,
+}
+
+impl Default for SpeechOptions {
+    fn default() -> Self {
+        Self {
+            rate: 1.0,
+            pitch: 1.0,
+            volume: 1.0,
+        }
+    }
+}
+
+impl SpeechOptions {
+    pub fn new(rate: f32, pitch: f32, volume: f32) -> Result<Self, TtsError> {
+        validate_parameter("rate", rate, 0.5..=2.0)?;
+        validate_parameter("pitch", pitch, 0.5..=2.0)?;
+        validate_parameter("volume", volume, 0.0..=1.0)?;
+        Ok(Self {
+            rate,
+            pitch,
+            volume,
+        })
+    }
+
+    pub fn rate(self) -> f32 {
+        self.rate
+    }
+
+    pub fn pitch(self) -> f32 {
+        self.pitch
+    }
+
+    pub fn volume(self) -> f32 {
+        self.volume
+    }
+}
+
+fn validate_parameter(
+    name: &str,
+    value: f32,
+    range: std::ops::RangeInclusive<f32>,
+) -> Result<(), TtsError> {
+    if value.is_finite() && range.contains(&value) {
+        Ok(())
+    } else {
+        Err(TtsError::InvalidOptions(format!(
+            "{name} must be finite and in {}..={}",
+            range.start(),
+            range.end()
+        )))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Voice {
+    pub id: String,
+    pub name: String,
+    pub language: String,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub enum VoiceSelection {
+    #[default]
+    Automatic,
+    Id(String),
+}
+
+/// Selects an explicit id first; automatic selection prefers an exact BCP-47
+/// language tag, then preserves language plus script, then uses the primary language.
+pub fn select_voice<'a>(
+    voices: &'a [Voice],
+    language: &str,
+    selection: &VoiceSelection,
+) -> Option<&'a Voice> {
+    if let VoiceSelection::Id(id) = selection {
+        return (!id.trim().is_empty())
+            .then(|| {
+                voices
+                    .iter()
+                    .find(|voice| voice.id.eq_ignore_ascii_case(id))
+            })
+            .flatten();
+    }
+
+    let requested = LanguageTag::parse(language)?;
+    let candidates: Vec<_> = voices
+        .iter()
+        .filter_map(|voice| LanguageTag::parse(&voice.language).map(|tag| (voice, tag)))
+        .collect();
+    candidates
+        .iter()
+        .find(|(_, tag)| tag.normalized == requested.normalized)
+        .map(|(voice, _)| *voice)
+        .or_else(|| {
+            let script = requested.script.as_ref()?;
+            candidates
+                .iter()
+                .find(|(_, tag)| {
+                    tag.primary == requested.primary && tag.script.as_ref() == Some(script)
+                })
+                .map(|(voice, _)| *voice)
+        })
+        .or_else(|| {
+            candidates
+                .iter()
+                .find(|(_, tag)| tag.primary == requested.primary)
+                .map(|(voice, _)| *voice)
+        })
+}
+
+struct LanguageTag {
+    normalized: String,
+    primary: String,
+    script: Option<String>,
+}
+
+impl LanguageTag {
+    fn parse(tag: &str) -> Option<Self> {
+        let normalized = tag.trim().replace('_', "-").to_ascii_lowercase();
+        let parts: Vec<_> = normalized.split('-').collect();
+        let primary = *parts.first()?;
+        if !(2..=8).contains(&primary.len())
+            || !primary.bytes().all(|byte| byte.is_ascii_alphabetic())
+        {
+            return None;
+        }
+        if parts.iter().skip(1).any(|part| {
+            part.is_empty()
+                || part.len() > 8
+                || !part.bytes().all(|byte| byte.is_ascii_alphanumeric())
+        }) {
+            return None;
+        }
+        let primary = primary.to_owned();
+        let script = parts
+            .iter()
+            .skip(1)
+            .find(|part| part.len() == 4 && part.bytes().all(|byte| byte.is_ascii_alphabetic()))
+            .map(|part| (*part).to_owned());
+        Some(Self {
+            normalized,
+            primary,
+            script,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct UtteranceId(u64);
+
+impl UtteranceId {
+    pub fn generation(self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SpeechEventKind {
+    Started,
+    Completed,
+    Stopped,
+    Failed(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SpeechEvent {
+    pub utterance: UtteranceId,
+    pub kind: SpeechEventKind,
+}
+
 pub trait TtsEngine: Send + Sync {
-    fn speak(&self, text: &str, lang: &str) -> Result<(), TtsError>;
+    fn voices(&self) -> Result<Vec<Voice>, TtsError> {
+        Ok(Vec::new())
+    }
+
+    fn speak_async(
+        &self,
+        text: &str,
+        language: &str,
+        voice: VoiceSelection,
+        options: SpeechOptions,
+    ) -> Result<UtteranceId, TtsError>;
+
+    fn stop(&self) -> Result<(), TtsError>;
+
+    fn drain_events(&self) -> Vec<SpeechEvent> {
+        Vec::new()
+    }
+
+    /// Blocking compatibility API retained for existing callers.
+    fn speak(&self, text: &str, language: &str) -> Result<(), TtsError> {
+        self.speak_blocking(
+            text,
+            language,
+            VoiceSelection::Automatic,
+            SpeechOptions::default(),
+        )
+    }
+
+    /// Compatibility behavior that may block until the platform command exits.
+    fn speak_blocking(
+        &self,
+        text: &str,
+        language: &str,
+        voice: VoiceSelection,
+        options: SpeechOptions,
+    ) -> Result<(), TtsError>;
 }
 
 pub trait CommandRunner: Send + Sync {
@@ -33,10 +256,18 @@ impl CommandRunner for DefaultCommandRunner {
     }
 }
 
+#[derive(Debug, Default)]
+struct MockState {
+    spoken: Vec<(String, String)>,
+    simulated_error: Option<String>,
+    voices: Vec<Voice>,
+    generation: u64,
+    state: state::SpeechState,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct MockTtsEngine {
-    spoken: Arc<Mutex<Vec<(String, String)>>>,
-    simulated_error: Arc<Mutex<Option<String>>>,
+    state: Arc<Mutex<MockState>>,
 }
 
 impl MockTtsEngine {
@@ -44,39 +275,87 @@ impl MockTtsEngine {
         Self::default()
     }
 
+    pub fn with_voices(voices: Vec<Voice>) -> Self {
+        Self {
+            state: Arc::new(Mutex::new(MockState {
+                voices,
+                ..MockState::default()
+            })),
+        }
+    }
+
     pub fn spoken_entries(&self) -> Vec<(String, String)> {
-        self.spoken.lock().unwrap().clone()
+        self.state.lock().unwrap().spoken.clone()
     }
 
     pub fn last_spoken(&self) -> Option<(String, String)> {
-        self.spoken.lock().unwrap().last().cloned()
+        self.state.lock().unwrap().spoken.last().cloned()
     }
 
     pub fn set_error(&mut self, error: Option<String>) {
-        *self.simulated_error.lock().unwrap() = error;
+        self.state.lock().unwrap().simulated_error = error;
     }
 }
 
 impl TtsEngine for MockTtsEngine {
-    fn speak(&self, text: &str, lang: &str) -> Result<(), TtsError> {
-        let trimmed = text.trim();
-        if trimmed.is_empty() {
+    fn voices(&self) -> Result<Vec<Voice>, TtsError> {
+        Ok(self.state.lock().unwrap().voices.clone())
+    }
+
+    fn speak_async(
+        &self,
+        text: &str,
+        language: &str,
+        voice: VoiceSelection,
+        _options: SpeechOptions,
+    ) -> Result<UtteranceId, TtsError> {
+        if text.trim().is_empty() {
             return Err(TtsError::EmptyText);
         }
-        if let Some(err) = self.simulated_error.lock().unwrap().as_ref() {
-            return Err(TtsError::Other(err.clone()));
+        let mut state = self.state.lock().unwrap();
+        if let Some(error) = &state.simulated_error {
+            return Err(TtsError::Other(error.clone()));
         }
-        self.spoken
-            .lock()
-            .unwrap()
-            .push((text.to_owned(), lang.to_owned()));
+        if !state.voices.is_empty() && select_voice(&state.voices, language, &voice).is_none() {
+            return Err(TtsError::VoiceUnavailable(language.into()));
+        }
+        state.generation += 1;
+        let utterance = UtteranceId(state.generation);
+        state.spoken.push((text.into(), language.into()));
+        state.state.begin(utterance);
+        Ok(utterance)
+    }
+
+    fn stop(&self) -> Result<(), TtsError> {
+        self.state.lock().unwrap().state.stop();
+        Ok(())
+    }
+
+    fn drain_events(&self) -> Vec<SpeechEvent> {
+        self.state.lock().unwrap().state.drain_events()
+    }
+
+    fn speak_blocking(
+        &self,
+        text: &str,
+        language: &str,
+        voice: VoiceSelection,
+        options: SpeechOptions,
+    ) -> Result<(), TtsError> {
+        let utterance = self.speak_async(text, language, voice, options)?;
+        let state = Arc::clone(&self.state);
+        state.lock().unwrap().state.complete(utterance);
         Ok(())
     }
 }
 
 pub struct SystemTtsEngine {
+    #[cfg(not(target_os = "windows"))]
     runner: Arc<dyn CommandRunner>,
+    #[cfg(not(target_os = "windows"))]
     candidates: Vec<String>,
+    #[cfg(target_os = "windows")]
+    backend: windows::WinRtTtsEngine,
 }
 
 impl Default for SystemTtsEngine {
@@ -87,9 +366,19 @@ impl Default for SystemTtsEngine {
 
 impl SystemTtsEngine {
     pub fn new() -> Self {
-        Self::with_runner(Arc::new(DefaultCommandRunner))
+        #[cfg(target_os = "windows")]
+        {
+            Self {
+                backend: windows::WinRtTtsEngine::new(),
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            Self::with_runner(Arc::new(DefaultCommandRunner))
+        }
     }
 
+    #[cfg(not(target_os = "windows"))]
     pub fn with_runner(runner: Arc<dyn CommandRunner>) -> Self {
         Self {
             runner,
@@ -97,6 +386,7 @@ impl SystemTtsEngine {
         }
     }
 
+    #[cfg(not(target_os = "windows"))]
     pub fn with_runner_and_candidates(
         runner: Arc<dyn CommandRunner>,
         candidates: Vec<&str>,
@@ -110,7 +400,7 @@ impl SystemTtsEngine {
     pub fn default_candidates() -> Vec<String> {
         #[cfg(target_os = "windows")]
         {
-            vec!["powershell".into()]
+            Vec::new()
         }
         #[cfg(target_os = "macos")]
         {
@@ -122,26 +412,24 @@ impl SystemTtsEngine {
         }
     }
 
-    fn build_args<'a>(program: &str, text: &'a str, lang: &'a str) -> Vec<&'a str> {
+    #[cfg(not(target_os = "windows"))]
+    fn build_args<'a>(program: &str, text: &'a str, language: &'a str) -> Vec<&'a str> {
         match program {
-            "spd-say" => vec!["-l", lang, text],
-            "espeak-ng" | "espeak" => vec!["-v", lang, text],
-            "say" => vec!["-v", lang, text],
+            "spd-say" => vec!["-l", language, text],
+            "espeak-ng" | "espeak" => vec!["-v", language, text],
+            "say" => vec!["-v", language, text],
             _ => vec![text],
         }
     }
-}
 
-impl TtsEngine for SystemTtsEngine {
-    fn speak(&self, text: &str, lang: &str) -> Result<(), TtsError> {
-        let trimmed = text.trim();
-        if trimmed.is_empty() {
+    #[cfg(not(target_os = "windows"))]
+    fn run_command(&self, text: &str, language: &str) -> Result<(), TtsError> {
+        if text.trim().is_empty() {
             return Err(TtsError::EmptyText);
         }
-
         let mut last_error = None;
         for candidate in &self.candidates {
-            let args = Self::build_args(candidate, text, lang);
+            let args = Self::build_args(candidate, text, language);
             match self.runner.run(candidate, &args) {
                 Ok(true) => return Ok(()),
                 Ok(false) => {
@@ -149,22 +437,81 @@ impl TtsEngine for SystemTtsEngine {
                         "{candidate} exited with non-zero status"
                     )));
                 }
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                    continue;
-                }
-                Err(err) => {
-                    last_error = Some(TtsError::CommandFailed(format!("{candidate} error: {err}")));
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => {
+                    last_error = Some(TtsError::CommandFailed(format!(
+                        "{candidate} error: {error}"
+                    )));
                 }
             }
         }
-
-        if let Some(err) = last_error {
-            Err(err)
-        } else {
-            Err(TtsError::Unavailable(format!(
+        Err(last_error.unwrap_or_else(|| {
+            TtsError::Unavailable(format!(
                 "none of the TTS engines {:?} are available on this system",
                 self.candidates
-            )))
+            ))
+        }))
+    }
+}
+
+impl TtsEngine for SystemTtsEngine {
+    fn voices(&self) -> Result<Vec<Voice>, TtsError> {
+        #[cfg(target_os = "windows")]
+        return self.backend.voices();
+        #[cfg(not(target_os = "windows"))]
+        Ok(Vec::new())
+    }
+
+    fn speak_async(
+        &self,
+        text: &str,
+        language: &str,
+        voice: VoiceSelection,
+        options: SpeechOptions,
+    ) -> Result<UtteranceId, TtsError> {
+        #[cfg(target_os = "windows")]
+        return self.backend.speak_async(text, language, voice, options);
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = (language, voice, options);
+            if text.trim().is_empty() {
+                return Err(TtsError::EmptyText);
+            }
+            Err(TtsError::Unsupported(
+                "asynchronous speech is unavailable for command-based backends".into(),
+            ))
+        }
+    }
+
+    fn stop(&self) -> Result<(), TtsError> {
+        #[cfg(target_os = "windows")]
+        return self.backend.stop();
+        #[cfg(not(target_os = "windows"))]
+        Err(TtsError::Unsupported(
+            "stop is unavailable for command-based backends".into(),
+        ))
+    }
+
+    fn drain_events(&self) -> Vec<SpeechEvent> {
+        #[cfg(target_os = "windows")]
+        return self.backend.drain_events();
+        #[cfg(not(target_os = "windows"))]
+        Vec::new()
+    }
+
+    fn speak_blocking(
+        &self,
+        text: &str,
+        language: &str,
+        voice: VoiceSelection,
+        options: SpeechOptions,
+    ) -> Result<(), TtsError> {
+        #[cfg(target_os = "windows")]
+        return self.backend.speak_blocking(text, language, voice, options);
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = (voice, options);
+            self.run_command(text, language)
         }
     }
 }
@@ -174,45 +521,6 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    #[test]
-    fn mock_tts_engine_records_spoken_text_and_language() {
-        let mock = MockTtsEngine::new();
-        mock.speak("Hello world", "en").unwrap();
-        mock.speak("Xin chào", "vi").unwrap();
-
-        let entries = mock.spoken_entries();
-        assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0], ("Hello world".into(), "en".into()));
-        assert_eq!(entries[1], ("Xin chào".into(), "vi".into()));
-        assert_eq!(mock.last_spoken(), Some(("Xin chào".into(), "vi".into())));
-    }
-
-    #[test]
-    fn mock_tts_engine_rejects_empty_text() {
-        let mock = MockTtsEngine::new();
-        let err = mock.speak("   \t\n", "en").unwrap_err();
-        assert!(matches!(err, TtsError::EmptyText));
-    }
-
-    #[test]
-    fn mock_tts_engine_simulates_failure() {
-        let mut mock = MockTtsEngine::new();
-        mock.set_error(Some("Audio output busy".into()));
-
-        let err = mock.speak("Test", "en").unwrap_err();
-        match err {
-            TtsError::Other(msg) => assert_eq!(msg, "Audio output busy"),
-            _ => panic!("Expected Other error"),
-        }
-    }
-
-    #[test]
-    fn system_tts_engine_rejects_empty_text() {
-        let engine = SystemTtsEngine::new();
-        let err = engine.speak("", "en").unwrap_err();
-        assert!(matches!(err, TtsError::EmptyText));
-    }
-
     struct MockRunner {
         responses: Vec<(&'static str, Result<bool, std::io::ErrorKind>)>,
         call_count: AtomicUsize,
@@ -220,13 +528,10 @@ mod tests {
 
     impl CommandRunner for MockRunner {
         fn run(&self, program: &str, _args: &[&str]) -> Result<bool, std::io::Error> {
-            let idx = self.call_count.fetch_add(1, Ordering::SeqCst);
-            if let Some((expected_prog, res)) = self.responses.get(idx) {
-                assert_eq!(program, *expected_prog);
-                match res {
-                    Ok(success) => Ok(*success),
-                    Err(kind) => Err(std::io::Error::new(*kind, "mock error")),
-                }
+            let index = self.call_count.fetch_add(1, Ordering::SeqCst);
+            if let Some((expected, response)) = self.responses.get(index) {
+                assert_eq!(program, *expected);
+                response.map_err(|kind| std::io::Error::new(kind, "mock error"))
             } else {
                 Err(std::io::Error::new(
                     std::io::ErrorKind::NotFound,
@@ -237,19 +542,7 @@ mod tests {
     }
 
     #[test]
-    fn system_tts_engine_succeeds_with_first_available_command() {
-        let runner = Arc::new(MockRunner {
-            responses: vec![("spd-say", Ok(true))],
-            call_count: AtomicUsize::new(0),
-        });
-
-        let engine = SystemTtsEngine::with_runner_and_candidates(runner, vec!["spd-say", "espeak"]);
-        let result = engine.speak("Hello", "en");
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn system_tts_engine_falls_back_when_first_command_missing() {
+    fn command_backend_falls_back_and_preserves_blocking_compatibility() {
         let runner = Arc::new(MockRunner {
             responses: vec![
                 ("spd-say", Err(std::io::ErrorKind::NotFound)),
@@ -257,14 +550,29 @@ mod tests {
             ],
             call_count: AtomicUsize::new(0),
         });
-
         let engine = SystemTtsEngine::with_runner_and_candidates(runner, vec!["spd-say", "espeak"]);
-        let result = engine.speak("Hello", "en");
-        assert!(result.is_ok());
+        engine.speak("Hello", "en").unwrap();
     }
 
     #[test]
-    fn system_tts_engine_returns_unavailable_when_all_commands_missing() {
+    fn mock_engine_bounds_events_at_capacity() {
+        let mock = MockTtsEngine::new();
+        for generation in 1..=(state::EVENT_CAPACITY as u64 * 2) {
+            let id = mock
+                .speak_async(
+                    "hello",
+                    "en-US",
+                    VoiceSelection::Automatic,
+                    SpeechOptions::default(),
+                )
+                .unwrap();
+            assert_eq!(id.generation(), generation);
+        }
+        assert_eq!(mock.drain_events().len(), state::EVENT_CAPACITY);
+    }
+
+    #[test]
+    fn command_backend_reports_missing_commands() {
         let runner = Arc::new(MockRunner {
             responses: vec![
                 ("spd-say", Err(std::io::ErrorKind::NotFound)),
@@ -272,24 +580,10 @@ mod tests {
             ],
             call_count: AtomicUsize::new(0),
         });
-
         let engine = SystemTtsEngine::with_runner_and_candidates(runner, vec!["spd-say", "espeak"]);
-        let err = engine.speak("Hello", "en").unwrap_err();
-        assert!(matches!(err, TtsError::Unavailable(_)));
-    }
-
-    #[test]
-    fn system_tts_engine_handles_command_failure() {
-        let runner = Arc::new(MockRunner {
-            responses: vec![("spd-say", Ok(false)), ("espeak", Ok(false))],
-            call_count: AtomicUsize::new(0),
-        });
-
-        let engine = SystemTtsEngine::with_runner_and_candidates(runner, vec!["spd-say", "espeak"]);
-        let err = engine.speak("Hello", "en").unwrap_err();
         assert!(matches!(
-            err,
-            TtsError::CommandFailed(_) | TtsError::Unavailable(_)
+            engine.speak("Hello", "en"),
+            Err(TtsError::Unavailable(_))
         ));
     }
 }

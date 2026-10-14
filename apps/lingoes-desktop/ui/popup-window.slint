@@ -24,6 +24,7 @@ export component PopupWindow inherits Window {
     callback next();
     callback copy();
     callback speak();
+    callback stop();
     callback pin(bool);
     callback expand(bool);
     callback open-main();
@@ -137,6 +138,11 @@ export component PopupWindow inherits Window {
                 text: "Speak";
                 accessible-label: "Speak headword";
                 clicked => { root.speak(); }
+            }
+            Button {
+                text: "Stop";
+                accessible-label: "Stop speech";
+                clicked => { root.stop(); }
             }
 
             Rectangle { horizontal-stretch: 1; }

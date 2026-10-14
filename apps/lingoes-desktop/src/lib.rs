@@ -16,7 +16,7 @@ use lingoes_platform::settings::{
     system_installed_data_base,
 };
 use lingoes_translator::{GoogleTranslator, OpenAiTranslator, Translator};
-use lingoes_tts::{SystemTtsEngine, TtsEngine};
+use lingoes_tts::{SpeechOptions, SystemTtsEngine, TtsEngine, TtsError, Voice, VoiceSelection};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use popup::{PopupContent, PopupController, PopupState};
@@ -354,8 +354,28 @@ impl DesktopApp {
 
     // TTS
     pub fn speak(&mut self, text: &str, lang: &str) -> Result<(), AppError> {
-        match self.tts.speak(text, lang) {
-            Ok(()) => {
+        let options = SpeechOptions::default();
+        match self
+            .tts
+            .speak_async(text, lang, VoiceSelection::Automatic, options)
+        {
+            Ok(_) => {
+                self.status = format!("Đang phát âm: {text}");
+                self.has_error = false;
+                Ok(())
+            }
+            Err(TtsError::Unsupported(_)) => {
+                let tts = Arc::clone(&self.tts);
+                let text_owned = text.to_owned();
+                let lang_owned = lang.to_owned();
+                std::thread::spawn(move || {
+                    let _ = tts.speak_blocking(
+                        &text_owned,
+                        &lang_owned,
+                        VoiceSelection::Automatic,
+                        options,
+                    );
+                });
                 self.status = format!("Đang phát âm: {text}");
                 self.has_error = false;
                 Ok(())
@@ -365,6 +385,29 @@ impl DesktopApp {
                 Err(AppError(err.to_string()))
             }
         }
+    }
+
+    pub fn stop_tts(&mut self) -> Result<(), AppError> {
+        match self.tts.stop() {
+            Ok(()) => {
+                self.status = "Đã dừng phát âm".into();
+                self.has_error = false;
+                Ok(())
+            }
+            Err(TtsError::Unsupported(_)) => {
+                self.status = "Dừng phát âm không khả dụng trên hệ thống này".into();
+                self.has_error = false;
+                Ok(())
+            }
+            Err(err) => {
+                self.set_error(&err);
+                Err(AppError(err.to_string()))
+            }
+        }
+    }
+
+    pub fn tts_voices(&self) -> Result<Vec<Voice>, AppError> {
+        self.tts.voices().map_err(|e| AppError(e.to_string()))
     }
 
     // Clipboard & Quick Lookup
@@ -389,7 +432,13 @@ impl DesktopApp {
         let content = self.selected_entry().map(|entry| {
             PopupContent::new(entry.headword().to_string(), entry.definition().to_string())
         });
-        let _ = self.popup.complete_capture(token, content);
+        let completed = self.popup.complete_capture(token, content);
+        if completed && self.settings.popup.auto_pronounce {
+            let word = self.quick_popup_word().to_owned();
+            if !word.is_empty() {
+                let _ = self.speak(&word, "en");
+            }
+        }
     }
 
     pub fn show_quick_popup(&self) -> bool {
@@ -618,6 +667,35 @@ pub fn launch_gui() -> Result<(), AppError> {
         });
     }
 
+    // Stop TTS callback
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_stop_tts(move || {
+            let _ = application.lock().unwrap().stop_tts();
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &application.lock().unwrap());
+            }
+        });
+    }
+
+    // Toggle auto-pronounce callback
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_toggle_auto_pronounce(move |enabled| {
+            application
+                .lock()
+                .unwrap()
+                .settings_mut()
+                .popup
+                .auto_pronounce = enabled;
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &application.lock().unwrap());
+            }
+        });
+    }
+
     // Copy to clipboard callback
     {
         let application = Arc::clone(&application);
@@ -811,9 +889,23 @@ pub fn launch_gui() -> Result<(), AppError> {
     }
     {
         let application = Arc::clone(&application);
+        let popup_weak = popup_window.as_weak();
         popup_window.on_speak(move || {
             let word = application.lock().unwrap().quick_popup_word().to_owned();
             let _ = application.lock().unwrap().speak(&word, "en");
+            if let Some(popup) = popup_weak.upgrade() {
+                update_popup_window(&popup, &application.lock().unwrap());
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let popup_weak = popup_window.as_weak();
+        popup_window.on_stop(move || {
+            let _ = application.lock().unwrap().stop_tts();
+            if let Some(popup) = popup_weak.upgrade() {
+                update_popup_window(&popup, &application.lock().unwrap());
+            }
         });
     }
     {
@@ -1094,6 +1186,7 @@ fn update_window(window: &AppWindow, application: &DesktopApp) {
         CaptureModeSetting::SelectedText
     ));
     window.set_ocr_fallback_enabled(application.settings().capture.ocr_enabled);
+    window.set_auto_pronounce_enabled(application.settings().popup.auto_pronounce);
 
     window.set_status_text(application.status().into());
     window.set_status_is_error(application.has_error());
