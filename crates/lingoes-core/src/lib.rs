@@ -5,8 +5,8 @@ pub mod metadata;
 
 pub use document::{
     DefinitionSection, EntryBlock, FindMatch, FindResult, LinkReference, PartOfSpeech, Phonetic,
-    RichDocument, TextRange, escape_html, find_in_result, parse_rich_document, sanitize_html,
-    save_as_html,
+    RichDocument, TextRange, escape_html, find_in_result, format_definition_for_display,
+    parse_rich_document, sanitize_html, save_as_html, strip_tags,
 };
 pub use metadata::DictionaryMetadata;
 

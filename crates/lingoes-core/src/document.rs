@@ -837,6 +837,92 @@ pub fn strip_tags(html: &str) -> String {
     out
 }
 
+/// Formats raw dictionary HTML into clean, human-readable plain text with appropriate line breaks and unescaped entities for display widgets.
+pub fn format_definition_for_display(raw: &str) -> String {
+    if !raw.contains('<') || !raw.contains('>') {
+        return raw.to_string();
+    }
+
+    let mut result = String::with_capacity(raw.len());
+    let lower = raw.to_lowercase();
+    let bytes = raw.as_bytes();
+    let lower_bytes = lower.as_bytes();
+    let len = raw.len();
+    let mut i = 0;
+
+    while i < len {
+        if bytes[i] == b'<' {
+            let rest_lower = &lower_bytes[i..];
+            if rest_lower.starts_with(b"<br")
+                || rest_lower.starts_with(b"</p>")
+                || rest_lower.starts_with(b"</div>")
+                || rest_lower.starts_with(b"</li>")
+                || rest_lower.starts_with(b"</tr>")
+                || (rest_lower.starts_with(b"</h") && rest_lower.len() > 4 && rest_lower[4] == b'>')
+            {
+                result.push('\n');
+            }
+
+            while i < len && bytes[i] != b'>' {
+                i += 1;
+            }
+            if i < len {
+                i += 1;
+            }
+        } else if bytes[i] == b'&' {
+            let rest = &raw[i..];
+            if rest.starts_with("&nbsp;") {
+                result.push(' ');
+                i += 6;
+            } else if rest.starts_with("&amp;") {
+                result.push('&');
+                i += 5;
+            } else if rest.starts_with("&quot;") {
+                result.push('"');
+                i += 6;
+            } else if rest.starts_with("&#39;") {
+                result.push('\'');
+                i += 5;
+            } else if rest.starts_with("&lt;") {
+                result.push('<');
+                i += 4;
+            } else if rest.starts_with("&gt;") {
+                result.push('>');
+                i += 4;
+            } else if rest.starts_with("&bull;") {
+                result.push('•');
+                i += 6;
+            } else {
+                result.push('&');
+                i += 1;
+            }
+        } else {
+            let ch = raw[i..].chars().next().unwrap();
+            result.push(ch);
+            i += ch.len_utf8();
+        }
+    }
+
+    let mut cleaned = String::with_capacity(result.len());
+    let mut prev_empty = false;
+    for line in result.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            if !prev_empty && !cleaned.is_empty() {
+                cleaned.push('\n');
+                prev_empty = true;
+            }
+        } else {
+            if !cleaned.is_empty() && !prev_empty {
+                cleaned.push('\n');
+            }
+            cleaned.push_str(trimmed);
+            prev_empty = false;
+        }
+    }
+    cleaned
+}
+
 /// Generates a complete standalone HTML document with clean CSS styling, meta tags, and dictionary attribution header (IO-02).
 pub fn save_as_html(doc: &RichDocument) -> String {
     let title = format!(

@@ -1,6 +1,7 @@
 pub mod ipc;
 pub mod popup;
 pub mod settings;
+pub mod web_search;
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};

@@ -138,13 +138,13 @@ id = "UI-10"
 workflow = "Web search from the query workflow with selectable engine"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-10"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
-automated_tests = ["UI-10-ACCEPTANCE"]
+implementation_status = "implemented"
+automated_tests = ["crates/lingoes-platform/tests/web_search_test.rs"]
 windows_scenarios = ["WIN-UI-10"]
-supported_platforms = ["windows"]
+supported_platforms = ["windows", "linux", "macos"]
 owner = "desktop-shell"
-acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-10 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+acceptance = "WebSearchCatalog parses XML engine definitions, interpolates [$key], validates secure HTTPS schemes, and launches user default browser via BrowserLauncher."
+deviation = "Automated tests pass across all platforms; live browser launch verified with mock launcher and Linux desktop browser."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]

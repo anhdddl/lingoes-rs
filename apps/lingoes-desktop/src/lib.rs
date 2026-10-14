@@ -14,12 +14,14 @@ use lingoes_platform::settings::{
     CaptureModeSetting, DataRoot, Settings, SettingsStore, resolve_data_root,
     system_installed_data_base,
 };
+use lingoes_platform::web_search::{BrowserLauncher, DefaultBrowserLauncher, WebSearchCatalog};
 use lingoes_translator::{
     GoogleTranslator, OpenAiTranslator, TranslationError, TranslationRequest, TranslationResult,
     Translator,
 };
 use lingoes_tts::{SpeechOptions, SystemTtsEngine, TtsEngine, TtsError, Voice, VoiceSelection};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+use url::Url;
 
 use popup::{PopupContent, PopupController, PopupState};
 
@@ -76,6 +78,8 @@ pub struct DesktopApp {
     #[cfg(windows)]
     clipboard_listener: Option<lingoes_capture::windows::WindowsClipboardListener>,
     settings: Settings,
+    pub web_search_catalog: WebSearchCatalog,
+    pub browser_launcher: Arc<dyn BrowserLauncher>,
 }
 
 impl DesktopApp {
@@ -101,6 +105,20 @@ impl DesktopApp {
         translator: Arc<dyn Translator>,
         tts: Arc<dyn TtsEngine>,
     ) -> Result<Self, AppError> {
+        Self::with_all_services(
+            dictionary,
+            translator,
+            tts,
+            Arc::new(DefaultBrowserLauncher),
+        )
+    }
+
+    pub fn with_all_services(
+        dictionary: SqliteDictionary,
+        translator: Arc<dyn Translator>,
+        tts: Arc<dyn TtsEngine>,
+        browser_launcher: Arc<dyn BrowserLauncher>,
+    ) -> Result<Self, AppError> {
         let mut app = Self {
             dictionary,
             results: Vec::new(),
@@ -116,9 +134,35 @@ impl DesktopApp {
             #[cfg(windows)]
             clipboard_listener: None,
             settings: Settings::default(),
+            web_search_catalog: WebSearchCatalog::default(),
+            browser_launcher,
         };
         let _ = app.list_dictionaries();
         Ok(app)
+    }
+
+    pub fn web_search(&mut self, query: &str, engine_id: Option<&str>) -> Result<Url, AppError> {
+        let url = self
+            .web_search_catalog
+            .build_url(engine_id, query)
+            .map_err(|e| {
+                self.status = format!("Lỗi tìm kiếm web: {e}");
+                self.has_error = true;
+                AppError(e.to_string())
+            })?;
+        self.browser_launcher.open_url(&url).map_err(|e| {
+            self.status = format!("Không thể mở trình duyệt: {e}");
+            self.has_error = true;
+            AppError(e.to_string())
+        })?;
+        let engine_name = self
+            .web_search_catalog
+            .get_engine(engine_id.unwrap_or(self.web_search_catalog.default_engine_id()))
+            .map(|e| e.name.as_str())
+            .unwrap_or("Web");
+        self.status = format!("Mở tìm kiếm web qua {engine_name}...");
+        self.has_error = false;
+        Ok(url)
     }
 
     pub fn settings(&self) -> &Settings {
@@ -1194,12 +1238,19 @@ fn attach_windows_popup_adapter(
 
 fn update_popup_window(window: &PopupWindow, application: &DesktopApp) {
     window.set_headword(application.quick_popup_word().into());
-    window.set_definition(application.quick_popup_def().into());
-    window.set_dictionary_name(if application.quick_popup_word().is_empty() {
-        "".into()
-    } else {
-        "Lingoes DB".into()
-    });
+    let formatted_def = lingoes_core::format_definition_for_display(application.quick_popup_def());
+    window.set_definition(formatted_def.into());
+    let dict_badge = application
+        .selected_entry()
+        .and_then(|e| e.dictionary_name())
+        .unwrap_or_else(|| {
+            if application.quick_popup_word().is_empty() {
+                ""
+            } else {
+                "Lingoes DB"
+            }
+        });
+    window.set_dictionary_name(dict_badge.into());
     window.set_status_text(application.status().into());
     window.set_can_go_previous(application.selected_index().is_some_and(|index| index > 0));
     window.set_can_go_next(
@@ -1278,12 +1329,20 @@ fn update_window(window: &AppWindow, application: &DesktopApp) {
             .map_or(-1, |index| index as i32),
     );
     window.set_selected_headword(application.selected_headword().into());
-    window.set_selected_definition(application.selected_definition().into());
-    window.set_selected_dict_badge(if application.selected_headword().is_empty() {
-        "".into()
-    } else {
-        "Lingoes DB".into()
-    });
+    let formatted_def =
+        lingoes_core::format_definition_for_display(application.selected_definition());
+    window.set_selected_definition(formatted_def.into());
+    let dict_badge = application
+        .selected_entry()
+        .and_then(|e| e.dictionary_name())
+        .unwrap_or_else(|| {
+            if application.selected_headword().is_empty() {
+                ""
+            } else {
+                "Lingoes DB"
+            }
+        });
+    window.set_selected_dict_badge(dict_badge.into());
 
     let dict_rows: Vec<DictionaryItem> = application
         .dictionaries()

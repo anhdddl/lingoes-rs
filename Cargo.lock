@@ -2375,6 +2375,7 @@ dependencies = [
  "slint-build",
  "tempfile",
  "tokio",
+ "url",
 ]
 
 [[package]]
@@ -2403,6 +2404,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "toml",
+ "url",
  "windows",
 ]
 
