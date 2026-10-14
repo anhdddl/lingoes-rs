@@ -6,7 +6,13 @@ use opendict::{Dictionary, mdict::MdictDictionary, stardict::StarDictDictionary}
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use thiserror::Error;
 
+pub mod ld2;
+pub mod ldb;
+pub mod ldp;
 pub mod migrations;
+pub use ld2::{Ld2Dictionary, Ld2Error, clean_lingoes_xml, decode_text};
+pub use ldb::LdbArchive;
+pub use ldp::LdpPackage;
 pub use migrations::CURRENT_SCHEMA_VERSION;
 
 pub struct SqliteDictionary {
@@ -122,6 +128,9 @@ pub enum DictionaryFormat {
     Tsv,
     StarDict,
     Mdict,
+    Ld2,
+    Ldp,
+    Ldb,
 }
 
 impl DictionaryFormat {
@@ -130,6 +139,9 @@ impl DictionaryFormat {
             Self::Tsv => "tsv",
             Self::StarDict => "stardict",
             Self::Mdict => "mdict",
+            Self::Ld2 => "ld2",
+            Self::Ldp => "ldp",
+            Self::Ldb => "ldb",
         }
     }
 }
@@ -156,7 +168,19 @@ pub fn detect_format(path: &Path) -> Result<DictionaryFormat, ImportError> {
         Ok(DictionaryFormat::StarDict)
     } else if file_name.ends_with(".mdx") {
         Ok(DictionaryFormat::Mdict)
+    } else if file_name.ends_with(".ld2") || file_name.ends_with(".ldx") {
+        Ok(DictionaryFormat::Ld2)
+    } else if file_name.ends_with(".ldp") {
+        Ok(DictionaryFormat::Ldp)
+    } else if file_name.ends_with(".ldb") {
+        Ok(DictionaryFormat::Ldb)
     } else {
+        if let Ok(mut file) = std::fs::File::open(path) {
+            let mut magic = [0u8; 4];
+            if file.read_exact(&mut magic).is_ok() && (&magic == b"?LD2" || &magic == b"?LDX") {
+                return Ok(DictionaryFormat::Ld2);
+            }
+        }
         Err(ImportError::UnsupportedFormat {
             path: path.display().to_string(),
         })
@@ -500,9 +524,6 @@ impl SqliteDictionary {
         name: Option<&str>,
         mut on_progress: impl FnMut(ImportProgress),
     ) -> Result<ImportReport, ImportError> {
-        const MAX_ENTRIES: usize = 5_000_000;
-        const MAX_ENTRY_BYTES: usize = 16 * 1024 * 1024;
-
         let path = path.as_ref();
         let format = detect_format(path)?;
         if format == DictionaryFormat::Tsv {
@@ -524,6 +545,30 @@ impl SqliteDictionary {
         let source_str = path.display().to_string();
 
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
+
+        if format == DictionaryFormat::Ldb {
+            let dicts = ldb::LdbArchive::extract_and_parse(path)?;
+            let mut total_report = ImportReport::default();
+            for (idx, sub_dict) in dicts.into_iter().enumerate() {
+                let sub_name = if idx == 0 {
+                    dict_name.clone()
+                } else {
+                    format!("{dict_name} ({})", sub_dict.info().name)
+                };
+                let report = self.import_boxed_dictionary(
+                    Box::new(sub_dict),
+                    &sub_name,
+                    DictionaryFormat::Ldb,
+                    &source_str,
+                    &mut on_progress,
+                )?;
+                total_report.imported += report.imported;
+                total_report.inserted += report.inserted;
+                total_report.updated += report.updated;
+            }
+            return Ok(total_report);
+        }
+
         let dictionary: Box<dyn Dictionary> = match format {
             DictionaryFormat::StarDict => {
                 let stem = stardict_stem(path).ok_or_else(|| ImportError::UnsupportedFormat {
@@ -538,8 +583,34 @@ impl SqliteDictionary {
                 MdictDictionary::open(parent)
                     .map_err(|error| ImportError::Format(error.to_string()))?,
             ),
-            DictionaryFormat::Tsv => unreachable!(),
+            DictionaryFormat::Ld2 => Box::new(
+                ld2::Ld2Dictionary::open(path)
+                    .map_err(|error| ImportError::Format(error.to_string()))?,
+            ),
+            DictionaryFormat::Ldp => Box::new(ldp::LdpPackage::extract_and_parse(path)?),
+            DictionaryFormat::Ldb | DictionaryFormat::Tsv => unreachable!(),
         };
+
+        self.import_boxed_dictionary(
+            dictionary,
+            &dict_name,
+            format,
+            &source_str,
+            &mut on_progress,
+        )
+    }
+
+    fn import_boxed_dictionary(
+        &mut self,
+        dictionary: Box<dyn Dictionary>,
+        dict_name: &str,
+        format: DictionaryFormat,
+        source_str: &str,
+        on_progress: &mut dyn FnMut(ImportProgress),
+    ) -> Result<ImportReport, ImportError> {
+        const MAX_ENTRIES: usize = 5_000_000;
+        const MAX_ENTRY_BYTES: usize = 16 * 1024 * 1024;
+
         let total = dictionary.word_count();
         if total > MAX_ENTRIES {
             return Err(ImportError::TooManyEntries {

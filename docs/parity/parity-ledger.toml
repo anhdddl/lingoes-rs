@@ -222,13 +222,13 @@ id = "DICT-01"
 workflow = "Native Lingoes dictionary install formats `.ld2` and `.ldp`"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-01"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["DICT-01-ACCEPTANCE"]
 windows_scenarios = ["WIN-DICT-01"]
 supported_platforms = ["windows"]
 owner = "dictionary"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-01 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Clean-room parser for LD2/LDX/LDP implemented with synthetic tests; Windows runtime not run."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
