@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 
+use lingoes_core::DictionaryMetadata;
 use opendict::{DictEntry, DictInfo, Dictionary};
 use thiserror::Error;
 
@@ -26,6 +27,7 @@ pub struct Ld2Dictionary {
     info: DictInfo,
     words: Vec<String>,
     entries: HashMap<String, Vec<String>>,
+    metadata: DictionaryMetadata,
 }
 
 impl Ld2Dictionary {
@@ -342,31 +344,69 @@ impl Ld2Dictionary {
                 .push(combined_def);
         }
 
-        let dict_name = name.unwrap_or("Lingoes Dictionary").to_string();
+        let mut metadata = DictionaryMetadata {
+            format: Some("ld2".to_string()),
+            entry_count: Some(words_list.len()),
+            ..DictionaryMetadata::default()
+        };
+
+        if dtype != 3 && offset_data + 8 < offset_with_info && offset_with_info <= bytes.len() {
+            let meta_slice = &bytes[offset_data + 8..offset_with_info];
+            parse_ld2_metadata_slice(meta_slice, &mut metadata);
+        }
+        if offset_data > 0x20 && offset_data <= bytes.len() {
+            let header_slice = &bytes[0x20..offset_data];
+            parse_ld2_metadata_slice(header_slice, &mut metadata);
+        }
+
+        let dict_name = if !metadata.title.is_empty() {
+            metadata.title.clone()
+        } else {
+            name.unwrap_or("Lingoes Dictionary").to_string()
+        };
+        metadata.title = dict_name.clone();
         let word_count = words_list.len();
 
         Ok(Self {
             info: create_dict_info(
                 dict_name,
-                "Lingoes".to_string(),
-                format!("Version: {version:#x}, Dict ID: {dict_id:#x}"),
+                metadata
+                    .author
+                    .clone()
+                    .unwrap_or_else(|| "Lingoes".to_string()),
+                metadata
+                    .description
+                    .clone()
+                    .unwrap_or_else(|| format!("Version: {version:#x}, Dict ID: {dict_id:#x}")),
                 word_count,
             ),
             words: words_list,
             entries: definitions_map,
+            metadata,
         })
     }
 
+    pub fn metadata(&self) -> &DictionaryMetadata {
+        &self.metadata
+    }
+
     fn empty(name: Option<&str>, version: u32, dict_id: u32) -> Self {
+        let dict_name = name.unwrap_or("Lingoes Dictionary").to_string();
         Self {
             info: create_dict_info(
-                name.unwrap_or("Lingoes Dictionary").to_string(),
+                dict_name.clone(),
                 "Lingoes".to_string(),
                 format!("Version: {version:#x}, Dict ID: {dict_id:#x}"),
                 0,
             ),
             words: Vec::new(),
             entries: HashMap::new(),
+            metadata: DictionaryMetadata {
+                title: dict_name,
+                format: Some("ld2".to_string()),
+                entry_count: Some(0),
+                ..Default::default()
+            },
         }
     }
 }
@@ -649,4 +689,88 @@ pub fn decode_html_entities(s: &str) -> String {
         }
     }
     out
+}
+
+fn parse_ld2_metadata_slice(slice: &[u8], meta: &mut DictionaryMetadata) {
+    if slice.is_empty() {
+        return;
+    }
+
+    let mut text_candidates = Vec::new();
+    if let Ok(utf8_str) = std::str::from_utf8(slice) {
+        text_candidates.push(utf8_str.to_string());
+    } else {
+        text_candidates.push(String::from_utf8_lossy(slice).to_string());
+    }
+
+    if slice.len() >= 2 {
+        let u16s: Vec<u16> = slice
+            .chunks_exact(2)
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect();
+        if let Ok(utf16_str) = String::from_utf16(&u16s) {
+            text_candidates.push(utf16_str);
+        }
+    }
+
+    for text in text_candidates {
+        extract_metadata_from_text(&text, meta);
+    }
+}
+
+fn extract_metadata_from_text(text: &str, meta: &mut DictionaryMetadata) {
+    let lower = text.to_lowercase();
+    let extract_attr_or_tag = |keys: &[&str]| -> Option<String> {
+        for &k in keys {
+            let k_attr = format!("{k}=\"");
+            if let Some(pos) = lower.find(&k_attr) {
+                let val_start = pos + k_attr.len();
+                if let Some(end) = text[val_start..].find('"') {
+                    let val = text[val_start..val_start + end].trim();
+                    if !val.is_empty() {
+                        return Some(val.to_string());
+                    }
+                }
+            }
+            let k_tag = format!("<{k}>");
+            let k_close = format!("</{k}>");
+            if let Some(pos) = lower.find(&k_tag) {
+                let val_start = pos + k_tag.len();
+                if let Some(end) = lower[val_start..].find(&k_close) {
+                    let val = text[val_start..val_start + end].trim();
+                    if !val.is_empty() {
+                        return Some(val.to_string());
+                    }
+                }
+            }
+        }
+        None
+    };
+
+    if meta.title.is_empty() || meta.title == "Lingoes Dictionary" {
+        if let Some(t) = extract_attr_or_tag(&["title", "bookname", "name"]) {
+            meta.title = t;
+        }
+    }
+    if meta.author.is_none() {
+        meta.author = extract_attr_or_tag(&["author", "creator"]);
+    }
+    if meta.publisher.is_none() {
+        meta.publisher = extract_attr_or_tag(&["publisher"]);
+    }
+    if meta.website.is_none() {
+        meta.website = extract_attr_or_tag(&["website", "url", "link"]);
+    }
+    if meta.copyright.is_none() {
+        meta.copyright = extract_attr_or_tag(&["copyright"]);
+    }
+    if meta.description.is_none() {
+        meta.description = extract_attr_or_tag(&["description", "summary", "intro"]);
+    }
+    if meta.source_lang.is_none() {
+        meta.source_lang = extract_attr_or_tag(&["langfrom", "from", "sourcelang"]);
+    }
+    if meta.target_lang.is_none() {
+        meta.target_lang = extract_attr_or_tag(&["langto", "to", "targetlang"]);
+    }
 }

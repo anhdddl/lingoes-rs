@@ -1,5 +1,15 @@
 use unicode_normalization::UnicodeNormalization;
 
+pub mod document;
+pub mod metadata;
+
+pub use document::{
+    DefinitionSection, EntryBlock, FindMatch, FindResult, LinkReference, PartOfSpeech, Phonetic,
+    RichDocument, TextRange, escape_html, find_in_result, parse_rich_document, sanitize_html,
+    save_as_html,
+};
+pub use metadata::DictionaryMetadata;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DictionaryEntry {
     headword: String,

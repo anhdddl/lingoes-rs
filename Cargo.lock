@@ -2354,6 +2354,7 @@ dependencies = [
 name = "lingoes-core"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "unicode-normalization",
 ]
 

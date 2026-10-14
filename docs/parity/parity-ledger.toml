@@ -292,13 +292,13 @@ id = "DICT-06"
 workflow = "Dictionary metadata/details (title, language, publisher, website, copyright, description)"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-06"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["DICT-06-ACCEPTANCE"]
 windows_scenarios = ["WIN-DICT-06"]
 supported_platforms = ["windows"]
 owner = "dictionary"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-06 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Metadata extraction and persistence for LD2/LDX, StarDict, and TSV headers is implemented; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -922,13 +922,13 @@ id = "IO-02"
 workflow = "Save search result as HTML"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#IO-02"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["IO-02-ACCEPTANCE"]
 windows_scenarios = ["WIN-IO-02"]
 supported_platforms = ["windows"]
 owner = "document"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for IO-02 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Standalone sanitized HTML export with independent styling and dictionary attribution is implemented; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -950,13 +950,13 @@ id = "IO-04"
 workflow = "Find and Select All in result content"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#IO-04"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["IO-04-ACCEPTANCE"]
 windows_scenarios = ["WIN-IO-04"]
 supported_platforms = ["windows"]
 owner = "document"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for IO-04 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Find-in-result match ranges, highlighting, and select-all document support are implemented; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]

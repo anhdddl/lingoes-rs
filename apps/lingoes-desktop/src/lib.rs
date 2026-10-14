@@ -31,6 +31,7 @@ Usage:
   lingoes-desktop lookup <dictionary.db> <query>
   lingoes-desktop full-text <dictionary.db> <query>
   lingoes-desktop list-dictionaries <dictionary.db>
+  lingoes-desktop dict info <dictionary.db> <id>
   lingoes-desktop toggle-dictionary <dictionary.db> <id> <true|false>
   lingoes-desktop delete-dictionary <dictionary.db> <id>
   lingoes-desktop translate <text> [--engine google|openai] [--from <code>] [--to <code>]
@@ -571,6 +572,50 @@ pub fn launch_gui() -> Result<(), AppError> {
         });
     }
 
+    // Export selected rich result as standalone sanitized HTML (IO-02).
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_export_result_html(move || {
+            let mut app = application.lock().unwrap();
+            if let Some(entry) = app.selected_entry() {
+                let attribution = entry.dictionary_name().unwrap_or("Dictionary");
+                let document = lingoes_core::RichDocument::from_html(
+                    entry.headword(),
+                    entry.definition(),
+                    Some(attribution),
+                );
+                let safe_name: String = entry
+                    .headword()
+                    .chars()
+                    .map(|c| {
+                        if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                            c
+                        } else {
+                            '_'
+                        }
+                    })
+                    .collect();
+                let path = std::env::current_dir()
+                    .unwrap_or_else(|_| PathBuf::from("."))
+                    .join(format!("{safe_name}.html"));
+                match fs::write(&path, document.save_as_html()) {
+                    Ok(()) => {
+                        app.status = format!("Đã xuất HTML: {}", path.display());
+                        app.has_error = false;
+                    }
+                    Err(error) => {
+                        app.status = format!("Không thể xuất HTML: {error}");
+                        app.has_error = true;
+                    }
+                }
+            }
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &app);
+            }
+        });
+    }
+
     // Translate callback
     {
         let application = Arc::clone(&application);
@@ -810,6 +855,39 @@ pub fn run_with_services(
                 })
                 .collect::<Vec<_>>()
                 .join("\n"))
+        }
+        "dict" => {
+            if arguments.len() < 4 || arguments[1] != "info" {
+                return Err(AppError(format!(
+                    "usage: dict info <dictionary.db> <id>\n{USAGE}"
+                )));
+            }
+            let database_path = &arguments[2];
+            let id = arguments[3]
+                .parse::<i64>()
+                .map_err(|e| AppError(format!("invalid dictionary id: {e}")))?;
+            let dictionary = SqliteDictionary::open(database_path)
+                .map_err(|error| AppError(error.to_string()))?;
+            let metadata = dictionary
+                .get_dictionary_metadata(id)
+                .map_err(|error| AppError(error.to_string()))?
+                .ok_or_else(|| AppError(format!("dictionary {id} not found")))?;
+            let field =
+                |label: &str, value: Option<&str>| format!("{label}: {}", value.unwrap_or("-"));
+            Ok([
+                format!("ID: {id}"),
+                format!("Title: {}", metadata.title),
+                field("Author", metadata.author.as_deref()),
+                field("Publisher", metadata.publisher.as_deref()),
+                field("Website", metadata.website.as_deref()),
+                field("Copyright", metadata.copyright.as_deref()),
+                field("Description", metadata.description.as_deref()),
+                field("Source language", metadata.source_lang.as_deref()),
+                field("Target language", metadata.target_lang.as_deref()),
+                field("Format", metadata.format.as_deref()),
+                format!("Entries: {}", metadata.entry_count.unwrap_or_default()),
+            ]
+            .join("\n"))
         }
         "toggle-dictionary" => {
             if arguments.len() < 4 {

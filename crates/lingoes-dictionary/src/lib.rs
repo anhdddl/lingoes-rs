@@ -1,7 +1,7 @@
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 
-use lingoes_core::{DictionaryEntry, LookupQuery};
+use lingoes_core::{DictionaryEntry, DictionaryMetadata, LookupQuery};
 use opendict::{Dictionary, mdict::MdictDictionary, stardict::StarDictDictionary};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use thiserror::Error;
@@ -19,6 +19,9 @@ pub struct SqliteDictionary {
     connection: Connection,
     path: Option<PathBuf>,
 }
+
+/// Public database API name used by metadata/details consumers.
+pub type DictionaryDatabase = SqliteDictionary;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DictionaryGroup {
@@ -150,6 +153,65 @@ impl DictionaryFormat {
 pub struct ImportProgress {
     pub processed: usize,
     pub total: Option<usize>,
+}
+
+fn parse_tsv_metadata(content: &str) -> DictionaryMetadata {
+    let mut metadata = DictionaryMetadata::default();
+    for raw_line in content.lines() {
+        let trimmed = raw_line.trim();
+        if !trimmed.starts_with('#') {
+            if !trimmed.is_empty() {
+                break;
+            }
+            continue;
+        }
+        let comment = trimmed.trim_start_matches('#').trim();
+        let Some((key, value)) = comment.split_once(':') else {
+            continue;
+        };
+        let key = key.trim().to_ascii_lowercase().replace(['_', '-', ' '], "");
+        let value = value.trim();
+        if value.is_empty() {
+            continue;
+        }
+        match key.as_str() {
+            "title" | "bookname" | "name" => metadata.title = value.to_string(),
+            "author" | "creator" => metadata.author = Some(value.to_string()),
+            "publisher" => metadata.publisher = Some(value.to_string()),
+            "website" | "url" => metadata.website = Some(value.to_string()),
+            "copyright" => metadata.copyright = Some(value.to_string()),
+            "description" | "summary" => metadata.description = Some(value.to_string()),
+            "sourcelang" | "langfrom" | "from" => metadata.source_lang = Some(value.to_string()),
+            "targetlang" | "langto" | "to" => metadata.target_lang = Some(value.to_string()),
+            _ => {}
+        }
+    }
+    metadata
+}
+
+fn parse_ifo_metadata(path: &Path, fallback: &str) -> Result<DictionaryMetadata, ImportError> {
+    let text = std::fs::read_to_string(path)?;
+    let mut metadata = DictionaryMetadata::new(fallback);
+    metadata.format = Some("stardict".to_string());
+    for line in text.lines() {
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let value = value.trim();
+        match key.trim().to_ascii_lowercase().as_str() {
+            "bookname" => metadata.title = value.to_string(),
+            "author" => metadata.author = Some(value.to_string()),
+            "publisher" => metadata.publisher = Some(value.to_string()),
+            "website" => metadata.website = Some(value.to_string()),
+            "copyright" => metadata.copyright = Some(value.to_string()),
+            "description" => metadata.description = Some(value.to_string()),
+            "sourcelang" | "langfrom" => metadata.source_lang = Some(value.to_string()),
+            "targetlang" | "langto" => metadata.target_lang = Some(value.to_string()),
+            "wordcount" => metadata.entry_count = value.parse().ok(),
+            _ => {}
+        }
+    }
+    Ok(metadata)
 }
 
 pub fn detect_format(path: &Path) -> Result<DictionaryFormat, ImportError> {
@@ -319,6 +381,64 @@ impl SqliteDictionary {
         Ok(dictionaries)
     }
 
+    pub fn get_dictionary_metadata(
+        &self,
+        id: i64,
+    ) -> Result<Option<DictionaryMetadata>, DictionaryError> {
+        self.connection
+            .query_row(
+                "SELECT id, COALESCE(NULLIF(title, ''), name), author, publisher, website, copyright,
+                        description, source_lang, target_lang, format, entry_count
+                 FROM dictionaries WHERE id = ?1",
+                params![id],
+                |row| {
+                    Ok(DictionaryMetadata {
+                        id: row.get(0)?,
+                        title: row.get(1)?,
+                        author: row.get(2)?,
+                        publisher: row.get(3)?,
+                        website: row.get(4)?,
+                        copyright: row.get(5)?,
+                        description: row.get(6)?,
+                        source_lang: row.get(7)?,
+                        target_lang: row.get(8)?,
+                        format: row.get(9)?,
+                        entry_count: row.get::<_, Option<i64>>(10)?.map(|n| n as usize),
+                    })
+                },
+            )
+            .optional()
+            .map_err(DictionaryError::from)
+    }
+
+    pub fn update_dictionary_metadata(
+        &mut self,
+        id: i64,
+        metadata: &DictionaryMetadata,
+    ) -> Result<(), DictionaryError> {
+        let rows = self.connection.execute(
+            "UPDATE dictionaries
+             SET name = ?1, title = ?1, author = ?2, publisher = ?3, website = ?4,
+                 copyright = ?5, description = ?6, source_lang = ?7, target_lang = ?8
+             WHERE id = ?9",
+            params![
+                metadata.title,
+                metadata.author,
+                metadata.publisher,
+                metadata.website,
+                metadata.copyright,
+                metadata.description,
+                metadata.source_lang,
+                metadata.target_lang,
+                id
+            ],
+        )?;
+        if rows == 0 {
+            return Err(DictionaryError::NotFound(id));
+        }
+        Ok(())
+    }
+
     pub fn set_dictionary_order(
         &mut self,
         id: i64,
@@ -449,11 +569,20 @@ impl SqliteDictionary {
         name: Option<&str>,
         mut on_progress: impl FnMut(ImportProgress),
     ) -> Result<ImportReport, ImportError> {
+        let mut content = String::new();
+        let mut reader = reader;
+        reader.read_to_string(&mut content)?;
+        let mut metadata = parse_tsv_metadata(&content);
+
         let transaction = self
             .connection
             .transaction()
             .map_err(DictionaryError::from)?;
-        let dictionary_id = match name {
+        let effective_name = name
+            .filter(|value| !value.trim().is_empty())
+            .map(str::trim)
+            .or_else(|| (!metadata.title.is_empty()).then_some(metadata.title.as_str()));
+        let dictionary_id = match effective_name {
             Some(dict_name) if !dict_name.trim().is_empty() => {
                 transaction.execute(
                     "INSERT INTO dictionaries (name, format, source_path, enabled, entry_count, created_at, sort_order, in_query_group, in_index_group, in_capture_group)
@@ -465,7 +594,7 @@ impl SqliteDictionary {
             _ => ensure_default_dictionary(&transaction)?,
         };
         let mut report = ImportReport::default();
-        for (index, line) in BufReader::new(reader).lines().enumerate() {
+        for (index, line) in BufReader::new(content.as_bytes()).lines().enumerate() {
             let line_number = index + 1;
             let line = line?;
             let line = line.trim();
@@ -483,9 +612,29 @@ impl SqliteDictionary {
                 total: None,
             });
         }
+        metadata.id = Some(dictionary_id);
+        metadata.format = Some("tsv".to_string());
+        metadata.entry_count = Some(report.inserted + report.updated);
+        if metadata.title.is_empty() {
+            metadata.title = effective_name.unwrap_or("Imported TSV").to_string();
+        }
         transaction.execute(
-            "UPDATE dictionaries SET entry_count = (SELECT count(*) FROM entries WHERE dictionary_id = ?1) WHERE id = ?1",
-            params![dictionary_id],
+            "UPDATE dictionaries
+             SET entry_count = (SELECT count(*) FROM entries WHERE dictionary_id = ?1),
+                 title = ?2, author = ?3, publisher = ?4, website = ?5, copyright = ?6,
+                 description = ?7, source_lang = ?8, target_lang = ?9
+             WHERE id = ?1",
+            params![
+                dictionary_id,
+                metadata.title,
+                metadata.author,
+                metadata.publisher,
+                metadata.website,
+                metadata.copyright,
+                metadata.description,
+                metadata.source_lang,
+                metadata.target_lang
+            ],
         )?;
         transaction.commit().map_err(DictionaryError::from)?;
 
@@ -560,6 +709,7 @@ impl SqliteDictionary {
                     &sub_name,
                     DictionaryFormat::Ldb,
                     &source_str,
+                    None,
                     &mut on_progress,
                 )?;
                 total_report.imported += report.imported;
@@ -569,8 +719,10 @@ impl SqliteDictionary {
             return Ok(total_report);
         }
 
+        let mut extracted_metadata: Option<DictionaryMetadata> = None;
         let dictionary: Box<dyn Dictionary> = match format {
             DictionaryFormat::StarDict => {
+                extracted_metadata = Some(parse_ifo_metadata(path, &dict_name)?);
                 let stem = stardict_stem(path).ok_or_else(|| ImportError::UnsupportedFormat {
                     path: path.display().to_string(),
                 })?;
@@ -583,10 +735,12 @@ impl SqliteDictionary {
                 MdictDictionary::open(parent)
                     .map_err(|error| ImportError::Format(error.to_string()))?,
             ),
-            DictionaryFormat::Ld2 => Box::new(
-                ld2::Ld2Dictionary::open(path)
-                    .map_err(|error| ImportError::Format(error.to_string()))?,
-            ),
+            DictionaryFormat::Ld2 => {
+                let ld2_dictionary = ld2::Ld2Dictionary::open(path)
+                    .map_err(|error| ImportError::Format(error.to_string()))?;
+                extracted_metadata = Some(ld2_dictionary.metadata().clone());
+                Box::new(ld2_dictionary)
+            }
             DictionaryFormat::Ldp => Box::new(ldp::LdpPackage::extract_and_parse(path)?),
             DictionaryFormat::Ldb | DictionaryFormat::Tsv => unreachable!(),
         };
@@ -596,6 +750,7 @@ impl SqliteDictionary {
             &dict_name,
             format,
             &source_str,
+            extracted_metadata,
             &mut on_progress,
         )
     }
@@ -606,6 +761,7 @@ impl SqliteDictionary {
         dict_name: &str,
         format: DictionaryFormat,
         source_str: &str,
+        metadata: Option<DictionaryMetadata>,
         on_progress: &mut dyn FnMut(ImportProgress),
     ) -> Result<ImportReport, ImportError> {
         const MAX_ENTRIES: usize = 5_000_000;
@@ -664,10 +820,39 @@ impl SqliteDictionary {
                 total: Some(total),
             });
         }
-        transaction.execute(
-            "UPDATE dictionaries SET entry_count = (SELECT count(*) FROM entries WHERE dictionary_id = ?1) WHERE id = ?1",
-            params![dictionary_id],
-        )?;
+        if let Some(mut meta) = metadata {
+            meta.id = Some(dictionary_id);
+            meta.format = Some(format.as_str().to_string());
+            meta.entry_count = Some(report.inserted + report.updated);
+            if meta.title.is_empty() {
+                meta.title = dict_name.to_string();
+            }
+            transaction.execute(
+                "UPDATE dictionaries SET name = ?2, title = ?2, author = ?3, publisher = ?4,
+                        website = ?5, copyright = ?6, description = ?7, source_lang = ?8,
+                        target_lang = ?9,
+                        entry_count = (SELECT count(*) FROM entries WHERE dictionary_id = ?1)
+                 WHERE id = ?1",
+                params![
+                    dictionary_id,
+                    meta.title,
+                    meta.author,
+                    meta.publisher,
+                    meta.website,
+                    meta.copyright,
+                    meta.description,
+                    meta.source_lang,
+                    meta.target_lang
+                ],
+            )?;
+        } else {
+            transaction.execute(
+                "UPDATE dictionaries SET title = name,
+                        entry_count = (SELECT count(*) FROM entries WHERE dictionary_id = ?1)
+                 WHERE id = ?1",
+                params![dictionary_id],
+            )?;
+        }
         transaction.commit().map_err(DictionaryError::from)?;
 
         let _ = self.connection.execute(

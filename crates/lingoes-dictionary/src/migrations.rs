@@ -5,7 +5,7 @@ use rusqlite::{Connection, OptionalExtension};
 
 use crate::DictionaryError;
 
-pub const CURRENT_SCHEMA_VERSION: u32 = 3;
+pub const CURRENT_SCHEMA_VERSION: u32 = 4;
 
 pub fn schema_version(connection: &Connection) -> Result<u32, DictionaryError> {
     let migrations_table_exists: bool = connection
@@ -49,18 +49,27 @@ pub fn schema_version(connection: &Connection) -> Result<u32, DictionaryError> {
         return Ok(1);
     }
 
-    // dictionaries exists: check if sort_order column exists
+    // dictionaries exists: check which columns exist
     let mut stmt = connection.prepare("PRAGMA table_info(dictionaries)")?;
     let columns = stmt.query_map([], |r| r.get::<_, String>(1))?;
     let mut has_sort_order = false;
+    let mut has_title = false;
     for col in columns {
-        if col? == "sort_order" {
+        let c = col?;
+        if c == "sort_order" {
             has_sort_order = true;
-            break;
+        } else if c == "title" {
+            has_title = true;
         }
     }
 
-    if has_sort_order { Ok(3) } else { Ok(2) }
+    if has_title {
+        Ok(4)
+    } else if has_sort_order {
+        Ok(3)
+    } else {
+        Ok(2)
+    }
 }
 
 pub fn backup_database(
@@ -142,7 +151,15 @@ pub fn migrate_or_init(
                 sort_order INTEGER NOT NULL DEFAULT 0,
                 in_query_group BOOLEAN NOT NULL DEFAULT 1,
                 in_index_group BOOLEAN NOT NULL DEFAULT 1,
-                in_capture_group BOOLEAN NOT NULL DEFAULT 1
+                in_capture_group BOOLEAN NOT NULL DEFAULT 1,
+                title TEXT,
+                author TEXT,
+                publisher TEXT,
+                website TEXT,
+                copyright TEXT,
+                description TEXT,
+                source_lang TEXT,
+                target_lang TEXT
             );
 
             CREATE TABLE entries (
@@ -227,10 +244,11 @@ pub fn migrate_or_init(
             INSERT INTO schema_migrations (version, applied_at, description)
             VALUES (1, datetime('now'), 'Initial schema'),
                    (2, datetime('now'), 'Dictionaries, multi-dictionary entries, FTS5'),
-                   (3, datetime('now'), 'Ordering, groups, history, favorites, online cache, import jobs');",
+                   (3, datetime('now'), 'Ordering, groups, history, favorites, online cache, import jobs'),
+                   (4, datetime('now'), 'Dictionary metadata columns');",
         )?;
         tx.commit()?;
-        return Ok(3);
+        return Ok(4);
     }
 
     if current < 2 {
@@ -372,6 +390,43 @@ pub fn migrate_or_init(
 
             INSERT INTO schema_migrations (version, applied_at, description)
             VALUES (3, datetime('now'), 'Ordering, groups, history, favorites, online cache, import jobs');",
+        )?;
+        tx.commit()?;
+        applied += 1;
+    }
+
+    if current < 4 {
+        let tx = connection.transaction()?;
+        let needs_meta_columns = {
+            let mut stmt = tx.prepare("PRAGMA table_info(dictionaries)")?;
+            let columns = stmt.query_map([], |r| r.get::<_, String>(1))?;
+            let mut has_title = false;
+            for col in columns {
+                if col? == "title" {
+                    has_title = true;
+                    break;
+                }
+            }
+            !has_title
+        };
+
+        if needs_meta_columns {
+            tx.execute_batch(
+                "ALTER TABLE dictionaries ADD COLUMN title TEXT;
+                 ALTER TABLE dictionaries ADD COLUMN author TEXT;
+                 ALTER TABLE dictionaries ADD COLUMN publisher TEXT;
+                 ALTER TABLE dictionaries ADD COLUMN website TEXT;
+                 ALTER TABLE dictionaries ADD COLUMN copyright TEXT;
+                 ALTER TABLE dictionaries ADD COLUMN description TEXT;
+                 ALTER TABLE dictionaries ADD COLUMN source_lang TEXT;
+                 ALTER TABLE dictionaries ADD COLUMN target_lang TEXT;",
+            )?;
+        }
+
+        tx.execute(
+            "INSERT OR IGNORE INTO schema_migrations (version, applied_at, description)
+             VALUES (4, datetime('now'), 'Dictionary metadata columns');",
+            [],
         )?;
         tx.commit()?;
         applied += 1;
