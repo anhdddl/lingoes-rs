@@ -143,7 +143,7 @@ export component AppWindow inherits Window {
  in property <[DictionaryItem]> dictionaries; in-out property <string> import-path; in-out property <string> import-name;
  in-out property <bool> clipboard-monitor-enabled: false; in-out property <bool> cursor-capture-enabled: false; in-out property <bool> selection-capture-enabled: false; in-out property <bool> ocr-fallback-enabled: false; in-out property <string> openai-base-url: "http://localhost:20128/v1"; in-out property <string> openai-model: "auto"; in-out property <string> openai-api-key: ""; in-out property <string> default-target-lang: "vi";
  in property <string> status-text: "Sẵn sàng"; in property <bool> status-is-error: false; in-out property <bool> auto-pronounce-enabled: false;
- callback search(string); callback full-text-search(string); callback web-search(string, string); callback select-result(int); callback navigate-back(); callback navigate-forward(); callback speak(string, string); callback stop-tts(); callback copy-to-clipboard(string); callback export-result-html(); callback translate(string, string, string, string); callback cancel-translation(); callback import-dictionary(string, string); callback toggle-dictionary(int, bool); callback delete-dictionary(int); callback toggle-clipboard-monitor(bool); callback toggle-auto-pronounce(bool); callback configure-capture(bool, bool, bool);
+ callback search(string); callback live-search(string); callback full-text-search(string); callback web-search(string, string); callback select-result(int); callback navigate-back(); callback navigate-forward(); callback speak(string, string); callback stop-tts(); callback copy-to-clipboard(string); callback export-result-html(); callback translate(string, string, string, string); callback cancel-translation(); callback import-dictionary(string, string); callback toggle-dictionary(int, bool); callback delete-dictionary(int); callback toggle-clipboard-monitor(bool); callback toggle-auto-pronounce(bool); callback configure-capture(bool, bool, bool);
  VerticalLayout { spacing: 0px;
   Rectangle { height: 28px; background: #2570ab;
    Rectangle { y: 0px; height: 1px; background: #68a7d7; }
@@ -187,7 +187,7 @@ export component AppWindow inherits Window {
     Rectangle { horizontal-stretch: 1; background: white; border-color: #729bbd; border-width: 1px; border-radius: 2px;
      HorizontalLayout { padding-left: 6px; padding-right: 2px; spacing: 4px;
       BookIcon { }
-      LineEdit { text <=> root.query; placeholder-text: "Type a word or phrase to look up..."; accepted => { root.search(self.text); } }
+      LineEdit { text <=> root.query; placeholder-text: "Type a word to look up..."; edited(value) => { root.live-search(value); } accepted => { root.search(root.query); } }
       Rectangle { width: 18px; background: #edf4fa; border-color: #b5c9d9; border-width: 1px; Text { text: "▾"; color: #50718d; horizontal-alignment: center; vertical-alignment: center; font-size: 9px; } TouchArea { clicked => { root.show-history-tab = true; } } }
      }
     }

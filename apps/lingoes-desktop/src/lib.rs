@@ -78,6 +78,7 @@ pub struct DesktopApp {
     #[cfg(windows)]
     clipboard_listener: Option<lingoes_capture::windows::WindowsClipboardListener>,
     settings: Settings,
+    last_live_query: String,
     pub web_search_catalog: WebSearchCatalog,
     pub browser_launcher: Arc<dyn BrowserLauncher>,
 }
@@ -134,6 +135,7 @@ impl DesktopApp {
             #[cfg(windows)]
             clipboard_listener: None,
             settings: Settings::default(),
+            last_live_query: String::new(),
             web_search_catalog: WebSearchCatalog::default(),
             browser_launcher,
         };
@@ -179,7 +181,20 @@ impl DesktopApp {
     }
 
     pub fn search(&mut self, query: &str) {
+        self.last_live_query = query.trim().to_string();
         self.search_with_mode(query, false);
+    }
+
+    /// Updates prefix results while typing and skips duplicate normalized input.
+    /// Returns true only when a database lookup or clear operation was performed.
+    pub fn live_search(&mut self, query: &str) -> bool {
+        let normalized = query.trim();
+        if normalized == self.last_live_query {
+            return false;
+        }
+        self.last_live_query = normalized.to_string();
+        self.search_with_mode(normalized, false);
+        true
     }
 
     pub fn search_full_text(&mut self, query: &str) {
@@ -626,7 +641,22 @@ pub fn launch_gui_with_options(
         });
     }
 
-    // Full text search callback
+    // Prefix lookup on every edit. The indexed query is fast enough to stay
+    // synchronous while avoiding timer lag and stale-result races.
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_live_search(move |query| {
+            let changed = application.lock().unwrap().live_search(query.as_str());
+            if changed {
+                if let Some(window) = window_weak.upgrade() {
+                    update_window(&window, &application.lock().unwrap());
+                }
+            }
+        });
+    }
+
+    // Full-text search callback
     {
         let application = Arc::clone(&application);
         let window_weak = window.as_weak();
@@ -1724,6 +1754,48 @@ mod tests {
         assert_eq!(application.selected_index(), Some(0));
         assert_eq!(application.selected_definition(), "A systems language");
         assert!(application.status().contains("2"));
+        let _ = std::fs::remove_file(database_path);
+        let _ = std::fs::remove_file(source_path);
+    }
+
+    #[test]
+    fn live_search_updates_on_each_distinct_trimmed_query() {
+        let database_path = temporary_path("live-search", "db");
+        let source_path = temporary_path("live-search", "tsv");
+        std::fs::write(
+            &source_path,
+            "hello\tGreeting\nhelloed\tPast tense\nhelp\tAssist\n",
+        )
+        .unwrap();
+        let mut application = DesktopApp::open(&database_path).unwrap();
+        application.import_path(&source_path).unwrap();
+
+        assert!(application.live_search("h"));
+        assert_eq!(application.selected_headword(), "hello");
+        assert!(application.live_search("hel"));
+        assert_eq!(application.results().len(), 3);
+        assert!(!application.live_search(" hel "));
+        assert!(application.live_search("hello"));
+        assert_eq!(application.selected_headword(), "hello");
+        assert_eq!(application.results()[0].headword(), "hello");
+
+        let _ = std::fs::remove_file(database_path);
+        let _ = std::fs::remove_file(source_path);
+    }
+
+    #[test]
+    fn live_search_blank_input_clears_results_once() {
+        let database_path = temporary_path("live-search-blank", "db");
+        let source_path = temporary_path("live-search-blank", "tsv");
+        std::fs::write(&source_path, "hello\tGreeting\n").unwrap();
+        let mut application = DesktopApp::open(&database_path).unwrap();
+        application.import_path(&source_path).unwrap();
+        application.search("hello");
+
+        assert!(application.live_search(""));
+        assert!(application.results().is_empty());
+        assert!(!application.live_search("   "));
+
         let _ = std::fs::remove_file(database_path);
         let _ = std::fs::remove_file(source_path);
     }
