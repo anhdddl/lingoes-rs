@@ -4,6 +4,7 @@ members = [
     "crates/lingoes-capture",
     "crates/lingoes-core",
     "crates/lingoes-dictionary",
+    "crates/lingoes-platform",
     "crates/lingoes-translator",
     "crates/lingoes-tts",
     "xtask",
@@ -22,6 +23,7 @@ crossbeam-channel = "0.5"
 lingoes-capture = { path = "crates/lingoes-capture" }
 lingoes-core = { path = "crates/lingoes-core" }
 lingoes-dictionary = { path = "crates/lingoes-dictionary" }
+lingoes-platform = { path = "crates/lingoes-platform" }
 lingoes-translator = { path = "crates/lingoes-translator" }
 lingoes-tts = { path = "crates/lingoes-tts" }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

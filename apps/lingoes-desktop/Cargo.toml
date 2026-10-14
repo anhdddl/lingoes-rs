@@ -10,6 +10,7 @@ arboard = { workspace = true }
 lingoes-capture = { workspace = true }
 lingoes-core = { workspace = true }
 lingoes-dictionary = { workspace = true }
+lingoes-platform = { workspace = true }
 lingoes-translator = { workspace = true }
 lingoes-tts = { workspace = true }
 slint = { version = "=1.8.0", default-features = false, features = [
@@ -21,3 +22,6 @@ tokio = { workspace = true }
 
 [build-dependencies]
 slint-build = "=1.8.0"
+
+[dev-dependencies]
+tempfile = "3.15"

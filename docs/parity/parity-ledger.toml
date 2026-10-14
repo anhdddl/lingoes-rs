@@ -558,13 +558,13 @@ id = "CAP-07"
 workflow = "Native/global hotkeys for window, capture modes, pronunciation, copy, selected-text speech, stop, mini-window roll-up"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-07"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["CAP-07-ACCEPTANCE"]
 windows_scenarios = ["WIN-CAP-07"]
 supported_platforms = ["windows"]
 owner = "capture"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-07 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Matrix identifies an initial clean-room implementation of GlobalHotkeyService and Windows message host under cfg(windows); Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -572,13 +572,13 @@ id = "CAP-08"
 workflow = "System tray/notification icon with mode status and commands"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#CAP-08"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["CAP-08-ACCEPTANCE"]
 windows_scenarios = ["WIN-CAP-08"]
 supported_platforms = ["windows"]
 owner = "capture"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for CAP-08 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Matrix identifies an initial clean-room implementation of TrayService and Windows notify icon under cfg(windows); Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -978,13 +978,13 @@ id = "SET-01"
 workflow = "Persistent configuration dialog with General, Appearance, Connection, Speech, Hotkeys, Translation, Licenses, Capture, Other"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#SET-01"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["SET-01-ACCEPTANCE"]
 windows_scenarios = ["WIN-SET-01"]
 supported_platforms = ["windows"]
 owner = "settings"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for SET-01 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Matrix identifies an initial clean-room implementation of portable vs installed data-root resolution and settings persistence; configuration dialog UI remains pending and Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]

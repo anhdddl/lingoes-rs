@@ -8,6 +8,9 @@ use std::sync::{Arc, Mutex};
 use lingoes_capture::{ClipboardWatcher, SystemClipboardReader};
 use lingoes_core::{DictionaryEntry, LookupQuery};
 use lingoes_dictionary::{DictionaryMeta, SqliteDictionary};
+use lingoes_platform::settings::{
+    DataRoot, Settings, SettingsStore, resolve_data_root, system_installed_data_base,
+};
 use lingoes_translator::{GoogleTranslator, OpenAiTranslator, Translator};
 use lingoes_tts::{SystemTtsEngine, TtsEngine};
 use slint::{ModelRc, SharedString, VecModel};
@@ -60,6 +63,7 @@ pub struct DesktopApp {
     quick_popup_def: String,
     show_quick_popup: bool,
     clipboard_running: Option<Arc<AtomicBool>>,
+    settings: Settings,
 }
 
 impl DesktopApp {
@@ -98,9 +102,22 @@ impl DesktopApp {
             quick_popup_def: String::new(),
             show_quick_popup: false,
             clipboard_running: None,
+            settings: Settings::default(),
         };
         let _ = app.list_dictionaries();
         Ok(app)
+    }
+
+    pub fn settings(&self) -> &Settings {
+        &self.settings
+    }
+
+    pub fn settings_mut(&mut self) -> &mut Settings {
+        &mut self.settings
+    }
+
+    pub fn set_settings(&mut self, settings: Settings) {
+        self.settings = settings;
     }
 
     pub fn search(&mut self, query: &str) {
@@ -401,11 +418,37 @@ pub fn portable_database_path(executable: &Path) -> Result<PathBuf, AppError> {
     Ok(directory.join("data").join("lingoes.db"))
 }
 
+pub fn resolve_app_data_root(executable: &Path) -> Result<DataRoot, AppError> {
+    let installed_base = system_installed_data_base()
+        .unwrap_or_else(|_| executable.parent().unwrap_or(Path::new(".")).join("data"));
+    resolve_data_root(executable, &installed_base)
+        .map_err(|error| AppError(format!("cannot resolve data root: {error}")))
+}
+
+pub fn resolve_database_path(data_root: &DataRoot) -> PathBuf {
+    let branded = data_root.database_path();
+    if branded.exists() {
+        return branded;
+    }
+    let legacy = data_root.path.join("lingoes.db");
+    if legacy.exists() {
+        return legacy;
+    }
+    branded
+}
+
 pub fn launch_gui() -> Result<(), AppError> {
     let executable = std::env::current_exe()
         .map_err(|error| AppError(format!("cannot locate executable: {error}")))?;
-    let database_path = portable_database_path(&executable)?;
-    let application = Arc::new(Mutex::new(DesktopApp::open(database_path)?));
+    let data_root = resolve_app_data_root(&executable)?;
+    let settings_store = SettingsStore::new(data_root.settings_path());
+    let settings = settings_store
+        .load()
+        .map_err(|error| AppError(format!("cannot load settings: {error}")))?;
+    let database_path = resolve_database_path(&data_root);
+    let mut desktop_app = DesktopApp::open(database_path)?;
+    desktop_app.set_settings(settings);
+    let application = Arc::new(Mutex::new(desktop_app));
     let window = AppWindow::new().map_err(|error| AppError(error.to_string()))?;
 
     // Search callback
@@ -1216,5 +1259,27 @@ mod tests {
 
         assert_eq!(out, "Spoken: \"hello\" (en)");
         assert_eq!(mock_tts.last_spoken(), Some(("hello".into(), "en".into())));
+    }
+
+    #[test]
+    fn desktop_app_holds_and_modifies_settings() {
+        let database_path = temporary_path("settings-test", "db");
+        let mut app = DesktopApp::open(&database_path).unwrap();
+        assert_eq!(app.settings().schema_version, 1);
+        assert!(!app.settings().shell.close_to_tray);
+        let mut updated = app.settings().clone();
+        updated.shell.close_to_tray = true;
+        app.set_settings(updated);
+        assert!(app.settings().shell.close_to_tray);
+        let _ = std::fs::remove_file(database_path);
+    }
+
+    #[test]
+    fn resolve_database_path_uses_data_root() {
+        let temp = tempfile::tempdir().unwrap();
+        let exe = temp.path().join("lexiforge");
+        let data_root = resolve_app_data_root(&exe).unwrap();
+        let db_path = resolve_database_path(&data_root);
+        assert!(db_path.ends_with("lexiforge.db") || db_path.ends_with("lingoes.db"));
     }
 }
