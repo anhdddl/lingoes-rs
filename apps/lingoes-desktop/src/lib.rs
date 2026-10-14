@@ -1344,6 +1344,20 @@ fn update_window(window: &AppWindow, application: &DesktopApp) {
         });
     window.set_selected_dict_badge(dict_badge.into());
 
+    let lines_data: Vec<FormattedEntryLine> = if application.selected_headword().is_empty() {
+        Vec::new()
+    } else {
+        lingoes_core::parse_formatted_lines(application.selected_definition())
+            .into_iter()
+            .map(|l| FormattedEntryLine {
+                kind: SharedString::from(l.kind),
+                prefix: SharedString::from(l.prefix),
+                body: SharedString::from(l.body),
+            })
+            .collect()
+    };
+    window.set_definition_lines(ModelRc::new(VecModel::from(lines_data)));
+
     let dict_rows: Vec<DictionaryItem> = application
         .dictionaries()
         .iter()

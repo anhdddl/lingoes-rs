@@ -923,6 +923,110 @@ pub fn format_definition_for_display(raw: &str) -> String {
     cleaned
 }
 
+/// A structured line formatted for desktop card-style dictionary display.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct FormattedLine {
+    pub kind: String, // "headword", "phonetic", "pos", "section", "sense", "example", "bullet", "normal"
+    pub prefix: String, // e.g. "1.", "▸", "•"
+    pub body: String,
+}
+
+/// Parses a definition string (HTML or plain text) into structured lines with semantic classification for rich card rendering.
+pub fn parse_formatted_lines(raw: &str) -> Vec<FormattedLine> {
+    let plain = format_definition_for_display(raw);
+    let mut lines = Vec::new();
+
+    for line in plain.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if let Some(pos) = trimmed.find(" — /") {
+            let (head, rest) = trimmed.split_at(pos);
+            let phon = rest.trim_start_matches(" — ").trim();
+            lines.push(FormattedLine {
+                kind: "headword".into(),
+                prefix: String::new(),
+                body: head.trim().into(),
+            });
+            lines.push(FormattedLine {
+                kind: "phonetic".into(),
+                prefix: String::new(),
+                body: phon.into(),
+            });
+        } else if trimmed.starts_with('/') && trimmed.ends_with('/') {
+            lines.push(FormattedLine {
+                kind: "phonetic".into(),
+                prefix: String::new(),
+                body: trimmed.into(),
+            });
+        } else if trimmed.starts_with('■') {
+            if trimmed.contains("đồng nghĩa")
+                || trimmed.contains("liên quan")
+                || trimmed.contains("nguồn gốc")
+                || trimmed.contains("synonym")
+                || trimmed.contains("antonym")
+            {
+                lines.push(FormattedLine {
+                    kind: "section".into(),
+                    prefix: String::new(),
+                    body: trimmed.into(),
+                });
+            } else {
+                lines.push(FormattedLine {
+                    kind: "pos".into(),
+                    prefix: String::new(),
+                    body: trimmed.into(),
+                });
+            }
+        } else if let Some(stripped) = trimmed
+            .strip_prefix('▸')
+            .or_else(|| trimmed.strip_prefix('‣'))
+        {
+            lines.push(FormattedLine {
+                kind: "example".into(),
+                prefix: "▸".into(),
+                body: stripped.trim().into(),
+            });
+        } else if let Some(stripped) = trimmed.strip_prefix('•') {
+            lines.push(FormattedLine {
+                kind: "bullet".into(),
+                prefix: "•".into(),
+                body: stripped.trim().into(),
+            });
+        } else if let Some((prefix, body)) = try_split_numbered_sense(trimmed) {
+            lines.push(FormattedLine {
+                kind: "sense".into(),
+                prefix,
+                body,
+            });
+        } else {
+            lines.push(FormattedLine {
+                kind: "normal".into(),
+                prefix: String::new(),
+                body: trimmed.into(),
+            });
+        }
+    }
+
+    lines
+}
+
+fn try_split_numbered_sense(text: &str) -> Option<(String, String)> {
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i > 0 && i < bytes.len() && bytes[i] == b'.' {
+        let prefix = text[..=i].to_string();
+        let body = text[i + 1..].trim().to_string();
+        return Some((prefix, body));
+    }
+    None
+}
+
 /// Generates a complete standalone HTML document with clean CSS styling, meta tags, and dictionary attribution header (IO-02).
 pub fn save_as_html(doc: &RichDocument) -> String {
     let title = format!(
