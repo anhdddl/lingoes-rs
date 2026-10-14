@@ -2,7 +2,6 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
-#[cfg(not(windows))]
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -15,7 +14,10 @@ use lingoes_platform::settings::{
     CaptureModeSetting, DataRoot, Settings, SettingsStore, resolve_data_root,
     system_installed_data_base,
 };
-use lingoes_translator::{GoogleTranslator, OpenAiTranslator, Translator};
+use lingoes_translator::{
+    GoogleTranslator, OpenAiTranslator, TranslationError, TranslationRequest, TranslationResult,
+    Translator,
+};
 use lingoes_tts::{SpeechOptions, SystemTtsEngine, TtsEngine, TtsError, Voice, VoiceSelection};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
@@ -289,12 +291,13 @@ impl DesktopApp {
             .build()
             .map_err(|e| AppError(format!("runtime error: {e}")))?;
         let translator = Arc::clone(&self.translator);
-        let result = rt.block_on(translator.translate(text, from, to));
+        let req = TranslationRequest::new(text, from, to);
+        let result = rt.block_on(translator.translate(req));
         match result {
             Ok(translated) => {
-                self.status = "Dịch thành công".into();
+                self.status = format!("Dịch thành công qua {}", translated.provider);
                 self.has_error = false;
-                Ok(translated)
+                Ok(translated.text)
             }
             Err(err) => {
                 self.set_error(&err);
@@ -309,7 +312,7 @@ impl DesktopApp {
         from: &str,
         to: &str,
         opts: TranslationOptions<'_>,
-    ) -> Result<String, AppError> {
+    ) -> Result<TranslationResult, AppError> {
         let translator: Arc<dyn Translator> = match opts.engine.to_lowercase().trim() {
             "openai" | "llm" | "local" => {
                 let mut builder = OpenAiTranslator::builder();
@@ -338,10 +341,11 @@ impl DesktopApp {
             .enable_all()
             .build()
             .map_err(|e| AppError(format!("runtime error: {e}")))?;
-        let result = rt.block_on(translator.translate(text, from, to));
+        let req = TranslationRequest::new(text, from, to);
+        let result = rt.block_on(translator.translate(req));
         match result {
             Ok(translated) => {
-                self.status = "Dịch thành công".into();
+                self.status = format!("Dịch thành công qua {}", translated.provider);
                 self.has_error = false;
                 Ok(translated)
             }
@@ -759,38 +763,133 @@ pub fn launch_gui_with_options(
         });
     }
 
-    // Translate callback
+    // Translate & Cancel Translate callbacks (completely asynchronous off UI thread)
+    let active_translation_token: Arc<Mutex<Option<Arc<AtomicBool>>>> = Arc::new(Mutex::new(None));
     {
         let application = Arc::clone(&application);
         let window_weak = window.as_weak();
+        let active_token = Arc::clone(&active_translation_token);
         window.on_translate(move |text, from, to, engine| {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                return;
+            }
+
+            // Cancel any in-flight translation
+            if let Some(prev) = active_token.lock().unwrap().take() {
+                prev.store(true, Ordering::SeqCst);
+            }
+
+            let new_cancel = Arc::new(AtomicBool::new(false));
+            *active_token.lock().unwrap() = Some(Arc::clone(&new_cancel));
+
             if let Some(w) = window_weak.upgrade() {
                 w.set_is_translating(true);
-                let base_url = w.get_openai_base_url();
-                let model = w.get_openai_model();
-                let api_key = w.get_openai_api_key();
+                w.set_translate_target_text("Đang dịch...".into());
+                let base_url = w.get_openai_base_url().to_string();
+                let model = w.get_openai_model().to_string();
+                let api_key = w.get_openai_api_key().to_string();
+                let fallback_target = w.get_default_target_lang().to_string();
 
-                let res = application.lock().unwrap().translate_with_engine(
-                    text.as_str(),
-                    from.as_str(),
-                    to.as_str(),
-                    TranslationOptions {
-                        engine: engine.as_str(),
-                        base_url: Some(base_url.as_str()),
-                        model: Some(model.as_str()),
-                        api_key: Some(api_key.as_str()),
-                    },
-                );
+                let app_lock = application.lock().unwrap();
+                let translator: Arc<dyn Translator> = match engine.to_lowercase().trim() {
+                    "openai" | "llm" | "local" => {
+                        let mut builder = OpenAiTranslator::builder();
+                        if !base_url.trim().is_empty() {
+                            builder = builder.base_url(base_url);
+                        }
+                        if !model.trim().is_empty() {
+                            builder = builder.model(model);
+                        }
+                        if !api_key.trim().is_empty() {
+                            builder = builder.api_key(api_key);
+                        }
+                        Arc::new(builder.build())
+                    }
+                    "google" => Arc::new(GoogleTranslator::new()),
+                    _ => Arc::clone(&app_lock.translator),
+                };
+                drop(app_lock);
+
+                let cancel_for_worker = Arc::clone(&new_cancel);
+                let app_for_worker = Arc::clone(&application);
+                let win_for_worker = window_weak.clone();
+                let text_owned = text.to_string();
+                let from_owned = from.to_string();
+                let to_owned = to.to_string();
+
+                std::thread::spawn(move || {
+                    let mut req = TranslationRequest::new(text_owned, from_owned, to_owned);
+                    if !fallback_target.trim().is_empty() {
+                        req = req.with_fallback(fallback_target);
+                    }
+                    req = req.with_cancellation(Arc::clone(&cancel_for_worker));
+
+                    let rt = match tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                    {
+                        Ok(rt) => rt,
+                        Err(e) => {
+                            let _ = slint::invoke_from_event_loop(move || {
+                                if let Some(w) = win_for_worker.upgrade() {
+                                    w.set_is_translating(false);
+                                    w.set_translate_target_text(format!("Lỗi runtime: {e}").into());
+                                }
+                            });
+                            return;
+                        }
+                    };
+
+                    let res = rt.block_on(translator.translate(req));
+
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if cancel_for_worker.load(Ordering::SeqCst) {
+                            return;
+                        }
+                        if let Some(w) = win_for_worker.upgrade() {
+                            w.set_is_translating(false);
+                            let mut app = app_for_worker.lock().unwrap();
+                            match res {
+                                Ok(trans_res) => {
+                                    w.set_translate_target_text(trans_res.text.into());
+                                    app.status =
+                                        format!("Dịch thành công qua {}", trans_res.provider);
+                                    app.has_error = false;
+                                }
+                                Err(TranslationError::Cancelled) => {
+                                    w.set_translate_target_text("Đã hủy dịch.".into());
+                                    app.status = "Đã hủy phiên dịch".into();
+                                    app.has_error = false;
+                                }
+                                Err(err) => {
+                                    w.set_translate_target_text(format!("Lỗi: {err}").into());
+                                    app.status = format!("Lỗi dịch: {err}");
+                                    app.has_error = true;
+                                }
+                            }
+                            update_window(&w, &app);
+                        }
+                    });
+                });
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        let active_token = Arc::clone(&active_translation_token);
+        window.on_cancel_translation(move || {
+            if let Some(token) = active_token.lock().unwrap().take() {
+                token.store(true, Ordering::SeqCst);
+            }
+            if let Some(w) = window_weak.upgrade() {
                 w.set_is_translating(false);
-                match res {
-                    Ok(translated) => {
-                        w.set_translate_target_text(translated.into());
-                    }
-                    Err(err) => {
-                        w.set_translate_target_text(format!("Lỗi: {err}").into());
-                    }
-                }
-                update_window(&w, &application.lock().unwrap());
+                w.set_translate_target_text("Đã hủy dịch.".into());
+                let mut app = application.lock().unwrap();
+                app.status = "Đã hủy phiên dịch".into();
+                app.has_error = false;
+                update_window(&w, &app);
             }
         });
     }
@@ -1421,10 +1520,11 @@ pub fn run_with_services(
                 .enable_all()
                 .build()
                 .map_err(|e| AppError(format!("runtime error: {e}")))?;
+            let req = TranslationRequest::new(text.as_str(), from, to);
             let translated = rt
-                .block_on(translator.translate(text, from, to))
+                .block_on(translator.translate(req))
                 .map_err(|e| AppError(e.to_string()))?;
-            Ok(translated)
+            Ok(translated.text)
         }
         "tts" => {
             if arguments.len() < 2 {
@@ -1650,7 +1750,8 @@ mod tests {
         let mut app = DesktopApp::with_services(dict, mock_trans, mock_tts).unwrap();
         let res = app.translate("Hello", "en", "vi").unwrap();
         assert_eq!(res, "Xin chào");
-        assert_eq!(app.status(), "Dịch thành công");
+        assert!(app.status().starts_with("Dịch thành công"));
+        assert!(app.status().contains("Mock"));
 
         let _ = std::fs::remove_file(database_path);
     }

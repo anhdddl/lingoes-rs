@@ -698,13 +698,13 @@ id = "TR-07"
 workflow = "Local language mapping and fallback target when source equals target"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#TR-07"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["TR-07-ACCEPTANCE"]
 windows_scenarios = ["WIN-TR-07"]
 supported_platforms = ["windows"]
 owner = "translation"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TR-07 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Implemented with LanguageCatalog fallback target and automated acceptance tests; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -712,13 +712,13 @@ id = "TR-08"
 workflow = "Connection/proxy configuration and authenticated proxy"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#TR-08"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["TR-08-ACCEPTANCE"]
 windows_scenarios = ["WIN-TR-08"]
 supported_platforms = ["windows"]
 owner = "translation"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for TR-08 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Implemented with ProxyConfig authenticated proxy support and credential redaction; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
