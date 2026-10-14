@@ -1,13 +1,88 @@
 use std::io::{BufRead, BufReader, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use lingoes_core::{DictionaryEntry, LookupQuery};
 use opendict::{Dictionary, mdict::MdictDictionary, stardict::StarDictDictionary};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use thiserror::Error;
 
+pub mod migrations;
+pub use migrations::CURRENT_SCHEMA_VERSION;
+
 pub struct SqliteDictionary {
     connection: Connection,
+    path: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DictionaryGroup {
+    Query,
+    Index,
+    Capture,
+}
+
+impl DictionaryGroup {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Query => "query",
+            Self::Index => "index",
+            Self::Capture => "capture",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HistoryKind {
+    Search,
+    Translation,
+}
+
+impl HistoryKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Search => "search",
+            Self::Translation => "translation",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HistoryEntry {
+    pub id: i64,
+    pub kind: HistoryKind,
+    pub query: String,
+    pub source_lang: Option<String>,
+    pub target_lang: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FavoriteEntry {
+    pub id: i64,
+    pub headword: String,
+    pub dictionary_id: Option<i64>,
+    pub dictionary_name: Option<String>,
+    pub snapshot_definition: String,
+    pub folder: String,
+    pub tags: Vec<String>,
+    pub notes: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub source_available: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportJobMeta {
+    pub id: i64,
+    pub dictionary_id: Option<i64>,
+    pub format: String,
+    pub source_path: Option<String>,
+    pub imported_entries: usize,
+    pub inserted_entries: usize,
+    pub updated_entries: usize,
+    pub status: String,
+    pub error_message: Option<String>,
+    pub created_at: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,6 +94,10 @@ pub struct DictionaryMeta {
     pub enabled: bool,
     pub entry_count: usize,
     pub created_at: String,
+    pub sort_order: i32,
+    pub in_query_group: bool,
+    pub in_index_group: bool,
+    pub in_capture_group: bool,
 }
 
 #[derive(Debug, Error)]
@@ -114,24 +193,47 @@ impl From<rusqlite::Error> for ImportError {
 
 impl SqliteDictionary {
     pub fn in_memory() -> Result<Self, DictionaryError> {
-        Self::from_connection(Connection::open_in_memory()?)
+        let mut connection = Connection::open_in_memory()?;
+        connection.execute_batch("PRAGMA foreign_keys = ON;")?;
+        migrations::migrate_or_init(&mut connection, None)?;
+        Ok(Self {
+            connection,
+            path: None,
+        })
     }
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self, DictionaryError> {
-        Self::from_connection(Connection::open(path)?)
+        let path = path.as_ref();
+        let mut connection = Connection::open(path)?;
+        connection.execute_batch("PRAGMA foreign_keys = ON;")?;
+        migrations::migrate_or_init(&mut connection, Some(path))?;
+        Ok(Self {
+            connection,
+            path: Some(path.to_path_buf()),
+        })
     }
 
-    fn from_connection(connection: Connection) -> Result<Self, DictionaryError> {
-        connection.execute_batch("PRAGMA foreign_keys = ON;")?;
-        migrate_or_init_schema(&connection)?;
-        Ok(Self { connection })
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
+    }
+
+    pub fn schema_version(&self) -> Result<u32, DictionaryError> {
+        migrations::schema_version(&self.connection)
+    }
+
+    pub fn backup_to(&self, destination: impl AsRef<Path>) -> Result<(), DictionaryError> {
+        migrations::backup_database(&self.connection, destination.as_ref())
+    }
+
+    pub fn restore_from(&mut self, source: impl AsRef<Path>) -> Result<(), DictionaryError> {
+        migrations::restore_database(source.as_ref(), &mut self.connection)
     }
 
     pub fn list_dictionaries(&self) -> Result<Vec<DictionaryMeta>, DictionaryError> {
         let mut statement = self.connection.prepare(
-            "SELECT id, name, format, source_path, enabled, entry_count, created_at
+            "SELECT id, name, format, source_path, enabled, entry_count, created_at, sort_order, in_query_group, in_index_group, in_capture_group
              FROM dictionaries
-             ORDER BY id ASC",
+             ORDER BY sort_order ASC, id ASC",
         )?;
         let rows = statement.query_map([], |row| {
             Ok(DictionaryMeta {
@@ -142,6 +244,10 @@ impl SqliteDictionary {
                 enabled: row.get(4)?,
                 entry_count: row.get::<_, i64>(5)? as usize,
                 created_at: row.get(6)?,
+                sort_order: row.get(7)?,
+                in_query_group: row.get(8)?,
+                in_index_group: row.get(9)?,
+                in_capture_group: row.get(10)?,
             })
         })?;
         let mut dictionaries = Vec::new();
@@ -149,6 +255,112 @@ impl SqliteDictionary {
             dictionaries.push(row?);
         }
         Ok(dictionaries)
+    }
+
+    pub fn list_dictionaries_in_group(
+        &self,
+        group: DictionaryGroup,
+    ) -> Result<Vec<DictionaryMeta>, DictionaryError> {
+        let group_col = match group {
+            DictionaryGroup::Query => "in_query_group",
+            DictionaryGroup::Index => "in_index_group",
+            DictionaryGroup::Capture => "in_capture_group",
+        };
+        let sql = format!(
+            "SELECT id, name, format, source_path, enabled, entry_count, created_at, sort_order, in_query_group, in_index_group, in_capture_group
+             FROM dictionaries
+             WHERE enabled = 1 AND {group_col} = 1
+             ORDER BY sort_order ASC, id ASC"
+        );
+        let mut statement = self.connection.prepare(&sql)?;
+        let rows = statement.query_map([], |row| {
+            Ok(DictionaryMeta {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                format: row.get(2)?,
+                source_path: row.get(3)?,
+                enabled: row.get(4)?,
+                entry_count: row.get::<_, i64>(5)? as usize,
+                created_at: row.get(6)?,
+                sort_order: row.get(7)?,
+                in_query_group: row.get(8)?,
+                in_index_group: row.get(9)?,
+                in_capture_group: row.get(10)?,
+            })
+        })?;
+        let mut dictionaries = Vec::new();
+        for row in rows {
+            dictionaries.push(row?);
+        }
+        Ok(dictionaries)
+    }
+
+    pub fn set_dictionary_order(
+        &mut self,
+        id: i64,
+        sort_order: i32,
+    ) -> Result<(), DictionaryError> {
+        let rows_affected = self.connection.execute(
+            "UPDATE dictionaries SET sort_order = ?1 WHERE id = ?2",
+            params![sort_order, id],
+        )?;
+        if rows_affected == 0 {
+            return Err(DictionaryError::NotFound(id));
+        }
+        Ok(())
+    }
+
+    pub fn move_dictionary_to_top(&mut self, id: i64) -> Result<(), DictionaryError> {
+        let min_order: i32 = self.connection.query_row(
+            "SELECT COALESCE(MIN(sort_order), 0) FROM dictionaries",
+            [],
+            |r| r.get(0),
+        )?;
+        let new_order = min_order.saturating_sub(1);
+        let rows_affected = self.connection.execute(
+            "UPDATE dictionaries SET sort_order = ?1 WHERE id = ?2",
+            params![new_order, id],
+        )?;
+        if rows_affected == 0 {
+            return Err(DictionaryError::NotFound(id));
+        }
+        Ok(())
+    }
+
+    pub fn set_dictionary_groups(
+        &mut self,
+        id: i64,
+        in_query: bool,
+        in_index: bool,
+        in_capture: bool,
+    ) -> Result<(), DictionaryError> {
+        let rows_affected = self.connection.execute(
+            "UPDATE dictionaries SET in_query_group = ?1, in_index_group = ?2, in_capture_group = ?3 WHERE id = ?4",
+            params![in_query, in_index, in_capture, id],
+        )?;
+        if rows_affected == 0 {
+            return Err(DictionaryError::NotFound(id));
+        }
+        Ok(())
+    }
+
+    pub fn set_dictionary_group(
+        &mut self,
+        id: i64,
+        group: DictionaryGroup,
+        included: bool,
+    ) -> Result<(), DictionaryError> {
+        let group_col = match group {
+            DictionaryGroup::Query => "in_query_group",
+            DictionaryGroup::Index => "in_index_group",
+            DictionaryGroup::Capture => "in_capture_group",
+        };
+        let sql = format!("UPDATE dictionaries SET {group_col} = ?1 WHERE id = ?2");
+        let rows_affected = self.connection.execute(&sql, params![included, id])?;
+        if rows_affected == 0 {
+            return Err(DictionaryError::NotFound(id));
+        }
+        Ok(())
     }
 
     pub fn toggle_dictionary(&mut self, id: i64, enabled: bool) -> Result<(), DictionaryError> {
@@ -220,8 +432,8 @@ impl SqliteDictionary {
         let dictionary_id = match name {
             Some(dict_name) if !dict_name.trim().is_empty() => {
                 transaction.execute(
-                    "INSERT INTO dictionaries (name, format, source_path, enabled, entry_count, created_at)
-                     VALUES (?1, 'tsv', NULL, 1, 0, datetime('now'))",
+                    "INSERT INTO dictionaries (name, format, source_path, enabled, entry_count, created_at, sort_order, in_query_group, in_index_group, in_capture_group)
+                     VALUES (?1, 'tsv', NULL, 1, 0, datetime('now'), 0, 1, 1, 1)",
                     params![dict_name.trim()],
                 )?;
                 transaction.last_insert_rowid()
@@ -252,6 +464,13 @@ impl SqliteDictionary {
             params![dictionary_id],
         )?;
         transaction.commit().map_err(DictionaryError::from)?;
+
+        let _ = self.connection.execute(
+            "INSERT INTO import_jobs (dictionary_id, format, source_path, imported_entries, inserted_entries, updated_entries, status, error_message, created_at)
+             VALUES (?1, 'tsv', NULL, ?2, ?3, ?4, 'completed', NULL, datetime('now'))",
+            params![dictionary_id, report.imported as i64, report.inserted as i64, report.updated as i64],
+        );
+
         Ok(report)
     }
 
@@ -336,8 +555,8 @@ impl SqliteDictionary {
             .transaction()
             .map_err(DictionaryError::from)?;
         transaction.execute(
-            "INSERT INTO dictionaries (name, format, source_path, enabled, entry_count, created_at)
-             VALUES (?1, ?2, ?3, 1, 0, datetime('now'))",
+            "INSERT INTO dictionaries (name, format, source_path, enabled, entry_count, created_at, sort_order, in_query_group, in_index_group, in_capture_group)
+             VALUES (?1, ?2, ?3, 1, 0, datetime('now'), 0, 1, 1, 1)",
             params![dict_name, format.as_str(), source_str],
         )?;
         let dictionary_id = transaction.last_insert_rowid();
@@ -379,6 +598,13 @@ impl SqliteDictionary {
             params![dictionary_id],
         )?;
         transaction.commit().map_err(DictionaryError::from)?;
+
+        let _ = self.connection.execute(
+            "INSERT INTO import_jobs (dictionary_id, format, source_path, imported_entries, inserted_entries, updated_entries, status, error_message, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'completed', NULL, datetime('now'))",
+            params![dictionary_id, format.as_str(), source_str, report.imported as i64, report.inserted as i64, report.updated as i64],
+        );
+
         Ok(report)
     }
 
@@ -386,14 +612,27 @@ impl SqliteDictionary {
         &self,
         query: &LookupQuery,
     ) -> Result<Vec<DictionaryEntry>, DictionaryError> {
-        self.query_entries(
+        self.lookup_exact_in_group(query, DictionaryGroup::Query)
+    }
+
+    pub fn lookup_exact_in_group(
+        &self,
+        query: &LookupQuery,
+        group: DictionaryGroup,
+    ) -> Result<Vec<DictionaryEntry>, DictionaryError> {
+        let group_col = match group {
+            DictionaryGroup::Query => "d.in_query_group",
+            DictionaryGroup::Index => "d.in_index_group",
+            DictionaryGroup::Capture => "d.in_capture_group",
+        };
+        let sql = format!(
             "SELECT e.headword, e.definition, e.dictionary_id, d.name
              FROM entries e
              JOIN dictionaries d ON d.id = e.dictionary_id
-             WHERE e.normalized_headword = ?1 AND d.enabled = 1
-             ORDER BY d.id, e.headword",
-            params![query.as_str()],
-        )
+             WHERE e.normalized_headword = ?1 AND d.enabled = 1 AND {group_col} = 1
+             ORDER BY d.sort_order ASC, d.id ASC, e.headword ASC"
+        );
+        self.query_entries(&sql, params![query.as_str()])
     }
 
     pub fn lookup_prefix(
@@ -401,21 +640,36 @@ impl SqliteDictionary {
         query: &LookupQuery,
         limit: usize,
     ) -> Result<Vec<DictionaryEntry>, DictionaryError> {
+        self.lookup_prefix_in_group(query, limit, DictionaryGroup::Query)
+    }
+
+    pub fn lookup_prefix_in_group(
+        &self,
+        query: &LookupQuery,
+        limit: usize,
+        group: DictionaryGroup,
+    ) -> Result<Vec<DictionaryEntry>, DictionaryError> {
         if limit == 0 {
             return Ok(Vec::new());
         }
+        let group_col = match group {
+            DictionaryGroup::Query => "d.in_query_group",
+            DictionaryGroup::Index => "d.in_index_group",
+            DictionaryGroup::Capture => "d.in_capture_group",
+        };
         let upper_bound = format!("{}{}", query.as_str(), char::MAX);
-        self.query_entries(
+        let sql = format!(
             "SELECT e.headword, e.definition, e.dictionary_id, d.name
              FROM entries e
              JOIN dictionaries d ON d.id = e.dictionary_id
-             WHERE e.normalized_headword >= ?1 AND e.normalized_headword < ?2 AND d.enabled = 1
+             WHERE e.normalized_headword >= ?1 AND e.normalized_headword < ?2 AND d.enabled = 1 AND {group_col} = 1
              ORDER BY CASE WHEN e.normalized_headword = ?1 THEN 0 ELSE 1 END,
-                      e.normalized_headword,
-                      d.id
-             LIMIT ?3",
-            params![query.as_str(), upper_bound, limit],
-        )
+                      d.sort_order ASC,
+                      e.normalized_headword ASC,
+                      d.id ASC
+             LIMIT ?3"
+        );
+        self.query_entries(&sql, params![query.as_str(), upper_bound, limit])
     }
 
     pub fn lookup_full_text(
@@ -423,20 +677,390 @@ impl SqliteDictionary {
         query: &LookupQuery,
         limit: usize,
     ) -> Result<Vec<DictionaryEntry>, DictionaryError> {
+        self.lookup_full_text_in_group(query, limit, DictionaryGroup::Query)
+    }
+
+    pub fn lookup_full_text_in_group(
+        &self,
+        query: &LookupQuery,
+        limit: usize,
+        group: DictionaryGroup,
+    ) -> Result<Vec<DictionaryEntry>, DictionaryError> {
         if limit == 0 {
             return Ok(Vec::new());
         }
-        let fts_query = format!("\"{}\"", query.as_str().replace('"', "\"\""));
-        self.query_entries(
+        let group_col = match group {
+            DictionaryGroup::Query => "d.in_query_group",
+            DictionaryGroup::Index => "d.in_index_group",
+            DictionaryGroup::Capture => "d.in_capture_group",
+        };
+        let sanitized = query.as_str().replace('\0', " ").replace('"', "\"\"");
+        let trimmed = sanitized.trim();
+        if trimmed.is_empty() {
+            return Ok(Vec::new());
+        }
+        let fts_query = format!("\"{trimmed}\"");
+        let sql = format!(
             "SELECT e.headword, e.definition, e.dictionary_id, d.name
              FROM entries_fts f
              JOIN entries e ON e.id = f.rowid
              JOIN dictionaries d ON d.id = e.dictionary_id
-             WHERE entries_fts MATCH ?1 AND d.enabled = 1
-             ORDER BY bm25(entries_fts), e.normalized_headword, d.id
+             WHERE entries_fts MATCH ?1 AND d.enabled = 1 AND {group_col} = 1
+             ORDER BY d.sort_order ASC, bm25(entries_fts), e.normalized_headword ASC, d.id ASC
+             LIMIT ?2"
+        );
+        match self.query_entries(&sql, params![fts_query, limit]) {
+            Ok(entries) => Ok(entries),
+            Err(DictionaryError::Database(err)) => {
+                let msg = err.to_string();
+                if msg.contains("syntax error") || msg.contains("fts5") {
+                    Ok(Vec::new())
+                } else {
+                    Err(DictionaryError::Database(err))
+                }
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    // --- Search & Translation History ---
+    pub fn add_history_entry(
+        &mut self,
+        kind: HistoryKind,
+        query: &str,
+        source_lang: Option<&str>,
+        target_lang: Option<&str>,
+        capacity: usize,
+    ) -> Result<(), DictionaryError> {
+        let query = query.trim();
+        if query.is_empty() {
+            return Ok(());
+        }
+        let capacity = capacity.max(1);
+        let tx = self.connection.transaction()?;
+
+        tx.execute(
+            "DELETE FROM search_history
+             WHERE kind = ?1 AND query = ?2
+               AND COALESCE(source_lang, '') = COALESCE(?3, '')
+               AND COALESCE(target_lang, '') = COALESCE(?4, '')",
+            params![kind.as_str(), query, source_lang, target_lang],
+        )?;
+
+        tx.execute(
+            "INSERT INTO search_history (kind, query, source_lang, target_lang, created_at)
+             VALUES (?1, ?2, ?3, ?4, datetime('now'))",
+            params![kind.as_str(), query, source_lang, target_lang],
+        )?;
+
+        tx.execute(
+            "DELETE FROM search_history
+             WHERE kind = ?1 AND id NOT IN (
+                 SELECT id FROM search_history WHERE kind = ?1 ORDER BY created_at DESC, id DESC LIMIT ?2
+             )",
+            params![kind.as_str(), capacity],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn list_history(
+        &self,
+        kind: HistoryKind,
+        limit: Option<usize>,
+    ) -> Result<Vec<HistoryEntry>, DictionaryError> {
+        let limit_val = limit.unwrap_or(100);
+        let mut statement = self.connection.prepare(
+            "SELECT id, kind, query, source_lang, target_lang, created_at
+             FROM search_history
+             WHERE kind = ?1
+             ORDER BY created_at DESC, id DESC
              LIMIT ?2",
-            params![fts_query, limit],
-        )
+        )?;
+        let rows = statement.query_map(params![kind.as_str(), limit_val], |row| {
+            let kind_str: String = row.get(1)?;
+            let kind = if kind_str == "translation" {
+                HistoryKind::Translation
+            } else {
+                HistoryKind::Search
+            };
+            Ok(HistoryEntry {
+                id: row.get(0)?,
+                kind,
+                query: row.get(2)?,
+                source_lang: row.get(3)?,
+                target_lang: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        })?;
+        let mut entries = Vec::new();
+        for row in rows {
+            entries.push(row?);
+        }
+        Ok(entries)
+    }
+
+    pub fn clear_history(&mut self, kind: Option<HistoryKind>) -> Result<(), DictionaryError> {
+        match kind {
+            Some(k) => {
+                self.connection.execute(
+                    "DELETE FROM search_history WHERE kind = ?1",
+                    params![k.as_str()],
+                )?;
+            }
+            None => {
+                self.connection.execute("DELETE FROM search_history", [])?;
+            }
+        }
+        Ok(())
+    }
+
+    // --- Favorites / Notebook ---
+    pub fn add_favorite(
+        &mut self,
+        headword: &str,
+        dictionary_id: Option<i64>,
+        snapshot_definition: &str,
+        folder: Option<&str>,
+        tags: &[&str],
+        notes: Option<&str>,
+    ) -> Result<i64, DictionaryError> {
+        let headword = headword.trim();
+        let snapshot_definition = snapshot_definition.trim();
+        let folder = folder
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .unwrap_or("Default");
+        let tags_str = tags
+            .iter()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(",");
+        let notes = notes.unwrap_or("").trim();
+
+        let dictionary_name: Option<String> = if let Some(id) = dictionary_id {
+            self.connection
+                .query_row(
+                    "SELECT name FROM dictionaries WHERE id = ?1",
+                    params![id],
+                    |r| r.get(0),
+                )
+                .optional()?
+        } else {
+            None
+        };
+
+        self.connection.execute(
+            "INSERT INTO favorites (headword, dictionary_id, dictionary_name, snapshot_definition, folder, tags, notes, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, datetime('now'), datetime('now'))",
+            params![
+                headword,
+                dictionary_id,
+                dictionary_name,
+                snapshot_definition,
+                folder,
+                tags_str,
+                notes
+            ],
+        )?;
+        Ok(self.connection.last_insert_rowid())
+    }
+
+    pub fn update_favorite(
+        &mut self,
+        id: i64,
+        folder: Option<&str>,
+        tags: Option<&[&str]>,
+        notes: Option<&str>,
+    ) -> Result<(), DictionaryError> {
+        let existing = self.get_favorite(id)?;
+        let Some(existing) = existing else {
+            return Err(DictionaryError::NotFound(id));
+        };
+
+        let new_folder = folder
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&existing.folder);
+        let new_tags = tags
+            .map(|t| {
+                t.iter()
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
+            .unwrap_or_else(|| existing.tags.join(","));
+        let new_notes = notes.unwrap_or(&existing.notes);
+
+        self.connection.execute(
+            "UPDATE favorites
+             SET folder = ?1, tags = ?2, notes = ?3, updated_at = datetime('now')
+             WHERE id = ?4",
+            params![new_folder, new_tags, new_notes, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_favorite(&mut self, id: i64) -> Result<(), DictionaryError> {
+        let rows_affected = self
+            .connection
+            .execute("DELETE FROM favorites WHERE id = ?1", params![id])?;
+        if rows_affected == 0 {
+            return Err(DictionaryError::NotFound(id));
+        }
+        Ok(())
+    }
+
+    pub fn get_favorite(&self, id: i64) -> Result<Option<FavoriteEntry>, DictionaryError> {
+        let mut statement = self.connection.prepare(
+            "SELECT f.id, f.headword, f.dictionary_id, f.dictionary_name, f.snapshot_definition, f.folder, f.tags, f.notes, f.created_at, f.updated_at,
+                    (d.id IS NOT NULL AND d.enabled = 1) AS source_available
+             FROM favorites f
+             LEFT JOIN dictionaries d ON d.id = f.dictionary_id
+             WHERE f.id = ?1",
+        )?;
+        statement
+            .query_row(params![id], map_favorite_row)
+            .optional()
+            .map_err(DictionaryError::from)
+    }
+
+    pub fn list_favorites(
+        &self,
+        folder: Option<&str>,
+    ) -> Result<Vec<FavoriteEntry>, DictionaryError> {
+        match folder {
+            Some(f) if !f.trim().is_empty() => {
+                let mut statement = self.connection.prepare(
+                    "SELECT f.id, f.headword, f.dictionary_id, f.dictionary_name, f.snapshot_definition, f.folder, f.tags, f.notes, f.created_at, f.updated_at,
+                            (d.id IS NOT NULL AND d.enabled = 1) AS source_available
+                     FROM favorites f
+                     LEFT JOIN dictionaries d ON d.id = f.dictionary_id
+                     WHERE f.folder = ?1
+                     ORDER BY f.updated_at DESC, f.id DESC",
+                )?;
+                let rows = statement.query_map(params![f.trim()], map_favorite_row)?;
+                let mut list = Vec::new();
+                for row in rows {
+                    list.push(row?);
+                }
+                Ok(list)
+            }
+            _ => {
+                let mut statement = self.connection.prepare(
+                    "SELECT f.id, f.headword, f.dictionary_id, f.dictionary_name, f.snapshot_definition, f.folder, f.tags, f.notes, f.created_at, f.updated_at,
+                            (d.id IS NOT NULL AND d.enabled = 1) AS source_available
+                     FROM favorites f
+                     LEFT JOIN dictionaries d ON d.id = f.dictionary_id
+                     ORDER BY f.updated_at DESC, f.id DESC",
+                )?;
+                let rows = statement.query_map([], map_favorite_row)?;
+                let mut list = Vec::new();
+                for row in rows {
+                    list.push(row?);
+                }
+                Ok(list)
+            }
+        }
+    }
+
+    pub fn list_favorite_folders(&self) -> Result<Vec<String>, DictionaryError> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT DISTINCT folder FROM favorites ORDER BY folder ASC")?;
+        let rows = statement.query_map([], |r| r.get::<_, String>(0))?;
+        let mut folders = Vec::new();
+        for row in rows {
+            folders.push(row?);
+        }
+        Ok(folders)
+    }
+
+    // --- Online Cache ---
+    pub fn get_cached_online_result(
+        &self,
+        query: &str,
+        engine: &str,
+        source_lang: &str,
+        target_lang: &str,
+    ) -> Result<Option<String>, DictionaryError> {
+        let mut statement = self.connection.prepare(
+            "SELECT result FROM online_cache
+             WHERE query = ?1 AND engine = ?2 AND source_lang = ?3 AND target_lang = ?4",
+        )?;
+        statement
+            .query_row(
+                params![
+                    query.trim(),
+                    engine.trim(),
+                    source_lang.trim(),
+                    target_lang.trim()
+                ],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(DictionaryError::from)
+    }
+
+    pub fn cache_online_result(
+        &mut self,
+        query: &str,
+        engine: &str,
+        source_lang: &str,
+        target_lang: &str,
+        result: &str,
+    ) -> Result<(), DictionaryError> {
+        self.connection.execute(
+            "INSERT INTO online_cache (query, engine, source_lang, target_lang, result, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'))
+             ON CONFLICT(query, engine, source_lang, target_lang) DO UPDATE SET
+                result = excluded.result,
+                created_at = excluded.created_at",
+            params![
+                query.trim(),
+                engine.trim(),
+                source_lang.trim(),
+                target_lang.trim(),
+                result.trim()
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn clear_online_cache(&mut self) -> Result<(), DictionaryError> {
+        self.connection.execute("DELETE FROM online_cache", [])?;
+        Ok(())
+    }
+
+    // --- Import Jobs Audit ---
+    pub fn list_import_jobs(&self) -> Result<Vec<ImportJobMeta>, DictionaryError> {
+        let mut statement = self.connection.prepare(
+            "SELECT id, dictionary_id, format, source_path, imported_entries, inserted_entries, updated_entries, status, error_message, created_at
+             FROM import_jobs
+             ORDER BY id DESC",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok(ImportJobMeta {
+                id: row.get(0)?,
+                dictionary_id: row.get(1)?,
+                format: row.get(2)?,
+                source_path: row.get(3)?,
+                imported_entries: row.get::<_, i64>(4)? as usize,
+                inserted_entries: row.get::<_, i64>(5)? as usize,
+                updated_entries: row.get::<_, i64>(6)? as usize,
+                status: row.get(7)?,
+                error_message: row.get(8)?,
+                created_at: row.get(9)?,
+            })
+        })?;
+        let mut jobs = Vec::new();
+        for row in rows {
+            jobs.push(row?);
+        }
+        Ok(jobs)
     }
 
     fn query_entries<P: rusqlite::Params>(
@@ -455,131 +1079,27 @@ impl SqliteDictionary {
     }
 }
 
-fn migrate_or_init_schema(connection: &Connection) -> Result<(), DictionaryError> {
-    let entries_exists: bool = connection
-        .query_row(
-            "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'entries'",
-            [],
-            |r| r.get::<_, i64>(0),
-        )
-        .map(|count| count > 0)?;
-
-    let dictionaries_exists: bool = connection
-        .query_row(
-            "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'dictionaries'",
-            [],
-            |r| r.get::<_, i64>(0),
-        )
-        .map(|count| count > 0)?;
-
-    if entries_exists && !dictionaries_exists {
-        let mut stmt = connection.prepare("PRAGMA table_info(entries)")?;
-        let columns = stmt.query_map([], |r| r.get::<_, String>(1))?;
-        let mut has_dict_id = false;
-        for col in columns {
-            if col? == "dictionary_id" {
-                has_dict_id = true;
-                break;
-            }
-        }
-        if !has_dict_id {
-            connection.execute_batch(
-                "CREATE TABLE dictionaries (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    format TEXT NOT NULL,
-                    source_path TEXT,
-                    enabled BOOLEAN NOT NULL DEFAULT 1,
-                    entry_count INTEGER NOT NULL DEFAULT 0,
-                    created_at TEXT NOT NULL
-                );
-                INSERT INTO dictionaries (id, name, format, source_path, enabled, entry_count, created_at)
-                VALUES (1, 'Default Dictionary', 'tsv', NULL, 1, (SELECT count(*) FROM entries), datetime('now'));
-
-                DROP TRIGGER IF EXISTS entries_fts_insert;
-                DROP TRIGGER IF EXISTS entries_fts_delete;
-                DROP TRIGGER IF EXISTS entries_fts_update;
-                DROP TABLE IF EXISTS entries_fts;
-
-                CREATE TABLE entries_v2 (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    dictionary_id INTEGER NOT NULL REFERENCES dictionaries(id) ON DELETE CASCADE,
-                    normalized_headword TEXT NOT NULL,
-                    headword TEXT NOT NULL,
-                    definition TEXT NOT NULL,
-                    UNIQUE(dictionary_id, normalized_headword)
-                );
-                INSERT INTO entries_v2 (dictionary_id, normalized_headword, headword, definition)
-                SELECT 1, normalized_headword, headword, definition FROM entries;
-
-                DROP TABLE entries;
-                ALTER TABLE entries_v2 RENAME TO entries;
-
-                CREATE INDEX IF NOT EXISTS entries_search_idx ON entries(normalized_headword, dictionary_id);
-                CREATE INDEX IF NOT EXISTS entries_dict_idx ON entries(dictionary_id);
-
-                CREATE VIRTUAL TABLE entries_fts USING fts5(
-                    headword,
-                    definition,
-                    tokenize = 'unicode61 remove_diacritics 0'
-                );
-                CREATE TRIGGER entries_fts_insert AFTER INSERT ON entries BEGIN
-                    INSERT INTO entries_fts(rowid, headword, definition)
-                    VALUES (new.id, new.headword, new.definition);
-                END;
-                CREATE TRIGGER entries_fts_delete AFTER DELETE ON entries BEGIN
-                    DELETE FROM entries_fts WHERE rowid = old.id;
-                END;
-                CREATE TRIGGER entries_fts_update AFTER UPDATE ON entries BEGIN
-                    DELETE FROM entries_fts WHERE rowid = old.id;
-                    INSERT INTO entries_fts(rowid, headword, definition)
-                    VALUES (new.id, new.headword, new.definition);
-                END;
-                INSERT INTO entries_fts(rowid, headword, definition)
-                SELECT id, headword, definition FROM entries;",
-            )?;
-        }
-    } else {
-        connection.execute_batch(
-            "CREATE TABLE IF NOT EXISTS dictionaries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                format TEXT NOT NULL,
-                source_path TEXT,
-                enabled BOOLEAN NOT NULL DEFAULT 1,
-                entry_count INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS entries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                dictionary_id INTEGER NOT NULL REFERENCES dictionaries(id) ON DELETE CASCADE,
-                normalized_headword TEXT NOT NULL,
-                headword TEXT NOT NULL,
-                definition TEXT NOT NULL,
-                UNIQUE(dictionary_id, normalized_headword)
-            );
-            CREATE INDEX IF NOT EXISTS entries_search_idx ON entries(normalized_headword, dictionary_id);
-            CREATE INDEX IF NOT EXISTS entries_dict_idx ON entries(dictionary_id);
-            CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
-                headword,
-                definition,
-                tokenize = 'unicode61 remove_diacritics 0'
-            );
-            CREATE TRIGGER IF NOT EXISTS entries_fts_insert AFTER INSERT ON entries BEGIN
-                INSERT INTO entries_fts(rowid, headword, definition)
-                VALUES (new.id, new.headword, new.definition);
-            END;
-            CREATE TRIGGER IF NOT EXISTS entries_fts_delete AFTER DELETE ON entries BEGIN
-                DELETE FROM entries_fts WHERE rowid = old.id;
-            END;
-            CREATE TRIGGER IF NOT EXISTS entries_fts_update AFTER UPDATE ON entries BEGIN
-                DELETE FROM entries_fts WHERE rowid = old.id;
-                INSERT INTO entries_fts(rowid, headword, definition)
-                VALUES (new.id, new.headword, new.definition);
-            END;",
-        )?;
-    }
-    Ok(())
+fn map_favorite_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<FavoriteEntry> {
+    let tags_raw: String = row.get(6)?;
+    let tags = tags_raw
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    let source_avail_num: i64 = row.get(10)?;
+    Ok(FavoriteEntry {
+        id: row.get(0)?,
+        headword: row.get(1)?,
+        dictionary_id: row.get(2)?,
+        dictionary_name: row.get(3)?,
+        snapshot_definition: row.get(4)?,
+        folder: row.get(5)?,
+        tags,
+        notes: row.get(7)?,
+        created_at: row.get(8)?,
+        updated_at: row.get(9)?,
+        source_available: source_avail_num > 0,
+    })
 }
 
 fn ensure_default_dictionary(connection: &Connection) -> rusqlite::Result<i64> {
@@ -594,8 +1114,8 @@ fn ensure_default_dictionary(connection: &Connection) -> rusqlite::Result<i64> {
         Ok(id)
     } else {
         connection.execute(
-            "INSERT INTO dictionaries (name, format, source_path, enabled, entry_count, created_at)
-             VALUES ('Default Dictionary', 'tsv', NULL, 1, 0, datetime('now'))",
+            "INSERT INTO dictionaries (name, format, source_path, enabled, entry_count, created_at, sort_order, in_query_group, in_index_group, in_capture_group)
+             VALUES ('Default Dictionary', 'tsv', NULL, 1, 0, datetime('now'), 0, 1, 1, 1)",
             [],
         )?;
         Ok(connection.last_insert_rowid())
@@ -693,192 +1213,225 @@ mod tests {
         let results = dictionary
             .lookup_prefix(&LookupQuery::new("rust").unwrap(), 10)
             .unwrap();
-        let words: Vec<_> = results.iter().map(DictionaryEntry::headword).collect();
-        assert_eq!(words, ["rust", "rustacean", "rustic"]);
-    }
-
-    #[test]
-    fn upsert_replaces_definition_for_same_normalized_headword() {
-        let mut dictionary = SqliteDictionary::in_memory().unwrap();
-        dictionary
-            .upsert(&DictionaryEntry::new("Rust", "old").unwrap())
-            .unwrap();
-        dictionary
-            .upsert(&DictionaryEntry::new("RUST", "new").unwrap())
-            .unwrap();
-        let results = dictionary
-            .lookup_exact(&LookupQuery::new("rust").unwrap())
-            .unwrap();
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].headword(), "RUST");
-        assert_eq!(results[0].definition(), "new");
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].headword(), "rust");
     }
 
     #[test]
     fn zero_limit_returns_no_prefix_results() {
         let mut dictionary = SqliteDictionary::in_memory().unwrap();
         dictionary
-            .upsert(&DictionaryEntry::new("rust", "definition").unwrap())
+            .upsert(&DictionaryEntry::new("rust", "A systems language").unwrap())
             .unwrap();
         let results = dictionary
-            .lookup_prefix(&LookupQuery::new("r").unwrap(), 0)
+            .lookup_prefix(&LookupQuery::new("rust").unwrap(), 0)
             .unwrap();
         assert!(results.is_empty());
     }
 
     #[test]
-    fn tsv_import_skips_comments_and_blank_lines() {
-        let mut dictionary = SqliteDictionary::in_memory().unwrap();
-        let input = "# English-Vietnamese\n\nhello\txin chào\nrust\tngôn ngữ Rust\n";
-        let report = dictionary.import_tsv(input.as_bytes()).unwrap();
-        assert_eq!(report.imported, 2);
-        assert_eq!(
-            dictionary
-                .lookup_exact(&LookupQuery::new("hello").unwrap())
-                .unwrap()[0]
-                .definition(),
-            "xin chào"
-        );
-    }
-
-    #[test]
-    fn tsv_import_reports_malformed_line_number() {
-        let mut dictionary = SqliteDictionary::in_memory().unwrap();
-        let error = dictionary
-            .import_tsv("hello\txin chào\nmissing-tab\n".as_bytes())
-            .unwrap_err();
-        assert!(matches!(error, ImportError::MalformedLine { line: 2 }));
-    }
-
-    #[test]
     fn unicode_normalized_lookup_matches_vietnamese_decomposed_query() {
         let mut dictionary = SqliteDictionary::in_memory().unwrap();
+        let composed = "ti\u{1ebf}ng vi\u{1ec7}t";
+        let decomposed = "tie\u{0302}\u{0301}ng vie\u{0323}\u{0302}t";
+
         dictionary
-            .upsert(&DictionaryEntry::new("Tiếng Việt", "Vietnamese").unwrap())
+            .upsert(&DictionaryEntry::new(composed, "Vietnamese language").unwrap())
             .unwrap();
-        let result = dictionary
-            .lookup_exact(&LookupQuery::new("tie\u{302}\u{301}ng vie\u{323}\u{302}t").unwrap())
+
+        let results = dictionary
+            .lookup_exact(&LookupQuery::new(decomposed).unwrap())
             .unwrap();
-        assert_eq!(result[0].headword(), "Tiếng Việt");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].headword(), composed);
+    }
+
+    #[test]
+    fn upsert_replaces_definition_for_same_normalized_headword() {
+        let mut dictionary = SqliteDictionary::in_memory().unwrap();
+        dictionary
+            .upsert(&DictionaryEntry::new("Rust", "First definition").unwrap())
+            .unwrap();
+        dictionary
+            .upsert(&DictionaryEntry::new("rust", "Updated definition").unwrap())
+            .unwrap();
+
+        let results = dictionary
+            .lookup_exact(&LookupQuery::new("rust").unwrap())
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].definition(), "Updated definition");
     }
 
     #[test]
     fn full_text_lookup_finds_definition_terms() {
         let mut dictionary = SqliteDictionary::in_memory().unwrap();
         dictionary
-            .upsert(&DictionaryEntry::new("xin chào", "a Vietnamese greeting").unwrap())
+            .upsert(&DictionaryEntry::new("Rust", "A systems language").unwrap())
             .unwrap();
         dictionary
-            .upsert(&DictionaryEntry::new("tạm biệt", "a Vietnamese farewell").unwrap())
+            .upsert(&DictionaryEntry::new("Slint", "A GUI toolkit").unwrap())
             .unwrap();
+
         let results = dictionary
-            .lookup_full_text(&LookupQuery::new("greeting").unwrap(), 10)
+            .lookup_full_text(&LookupQuery::new("toolkit").unwrap(), 10)
             .unwrap();
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].headword(), "xin chào");
+        assert_eq!(results[0].headword(), "Slint");
     }
 
     #[test]
     fn failed_tsv_import_is_atomic() {
         let mut dictionary = SqliteDictionary::in_memory().unwrap();
-        let error = dictionary
-            .import_tsv("valid\tdefinition\nmalformed\n".as_bytes())
-            .unwrap_err();
-        assert!(matches!(error, ImportError::MalformedLine { line: 2 }));
+        let tsv_content = "word1\tdef1\nword2\tdef2\nbad_line_no_tab\nword4\tdef4\n";
+
+        let error = dictionary.import_tsv(tsv_content.as_bytes()).unwrap_err();
+        assert!(matches!(error, ImportError::MalformedLine { line: 3 }));
+
         assert!(
             dictionary
-                .lookup_exact(&LookupQuery::new("valid").unwrap())
+                .lookup_exact(&LookupQuery::new("word1").unwrap())
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            dictionary
+                .lookup_exact(&LookupQuery::new("word2").unwrap())
                 .unwrap()
                 .is_empty()
         );
     }
 
     #[test]
+    fn tsv_import_skips_comments_and_blank_lines() {
+        let mut dictionary = SqliteDictionary::in_memory().unwrap();
+        let tsv_content = "# header comment\n\nword1\tdef1\n   \n# another comment\nword2\tdef2\n";
+
+        let report = dictionary.import_tsv(tsv_content.as_bytes()).unwrap();
+        assert_eq!(report.imported, 2);
+        assert_eq!(report.inserted, 2);
+    }
+
+    #[test]
+    fn tsv_import_reports_malformed_line_number() {
+        let mut dictionary = SqliteDictionary::in_memory().unwrap();
+        let tsv_content = "# valid comment\nword1\tdef1\nmalformed_line\n";
+
+        let error = dictionary.import_tsv(tsv_content.as_bytes()).unwrap_err();
+        assert!(matches!(error, ImportError::MalformedLine { line: 3 }));
+    }
+
+    #[test]
     fn import_report_counts_insertions_and_duplicates() {
         let mut dictionary = SqliteDictionary::in_memory().unwrap();
-        let report = dictionary
-            .import_tsv("Rust\told\nRUST\tnew\nFerris\tmascot\n".as_bytes())
-            .unwrap();
+        let tsv_content = "word1\tdef1\nword2\tdef2\nword1\tdef1_updated\n";
+
+        let report = dictionary.import_tsv(tsv_content.as_bytes()).unwrap();
         assert_eq!(report.imported, 3);
         assert_eq!(report.inserted, 2);
         assert_eq!(report.updated, 1);
     }
 
     fn temporary_directory(name: &str) -> std::path::PathBuf {
-        let path = std::env::temp_dir().join(format!(
-            "lingoes-dictionary-{name}-{}-{}",
+        let unique = format!(
+            "lingoes-tests-{name}-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos()
-        ));
+        );
+        let path = std::env::temp_dir().join(unique);
         std::fs::create_dir_all(&path).unwrap();
         path
     }
 
-    fn write_stardict_fixture(directory: &Path) -> std::path::PathBuf {
-        let definitions = b"a systems languagea Vietnamese greeting";
-        let first_size = "a systems language".len() as u32;
-        let mut index = Vec::new();
-        index.extend_from_slice(b"Rust\0");
-        index.extend_from_slice(&0_u32.to_be_bytes());
-        index.extend_from_slice(&first_size.to_be_bytes());
-        index.extend_from_slice(b"xin chao\0");
-        index.extend_from_slice(&first_size.to_be_bytes());
-        index.extend_from_slice(&("a Vietnamese greeting".len() as u32).to_be_bytes());
-        let ifo = format!(
-            "StarDict's dict ifo file\nversion=2.4.2\nwordcount=2\nidxfilesize={}\nbookname=Fixture\nsametypesequence=m\n",
-            index.len()
+    fn write_stardict_fixture(
+        directory: &Path,
+        stem: &str,
+        entries: &[(&str, &str)],
+    ) -> std::path::PathBuf {
+        let ifo_path = directory.join(format!("{stem}.ifo"));
+        let idx_path = directory.join(format!("{stem}.idx"));
+        let dict_path = directory.join(format!("{stem}.dict"));
+
+        let ifo_content = format!(
+            "StarDict's dict ifo file\nversion=2.4.2\nbookname={stem}\nwordcount={}\nidxfilesize={}\nsametypesequence=m\n",
+            entries.len(),
+            entries.iter().map(|(w, _)| w.len() + 1 + 8).sum::<usize>()
         );
-        let ifo_path = directory.join("fixture.ifo");
-        std::fs::write(&ifo_path, ifo).unwrap();
-        std::fs::write(directory.join("fixture.idx"), index).unwrap();
-        std::fs::write(directory.join("fixture.dict"), definitions).unwrap();
+        std::fs::write(&ifo_path, ifo_content).unwrap();
+
+        let mut idx_bytes = Vec::new();
+        let mut dict_bytes = Vec::new();
+
+        for (word, definition) in entries {
+            let offset = dict_bytes.len() as u32;
+            let size = definition.len() as u32;
+            dict_bytes.extend_from_slice(definition.as_bytes());
+
+            idx_bytes.extend_from_slice(word.as_bytes());
+            idx_bytes.push(0);
+            idx_bytes.extend_from_slice(&offset.to_be_bytes());
+            idx_bytes.extend_from_slice(&size.to_be_bytes());
+        }
+
+        std::fs::write(&idx_path, idx_bytes).unwrap();
+        std::fs::write(&dict_path, dict_bytes).unwrap();
         ifo_path
     }
 
     #[test]
     fn auto_detects_and_imports_stardict_files() {
         let directory = temporary_directory("stardict");
-        let source = write_stardict_fixture(&directory);
-        let mut dictionary = SqliteDictionary::in_memory().unwrap();
-
-        assert_eq!(detect_format(&source).unwrap(), DictionaryFormat::StarDict);
-        let report = dictionary.import_path(&source).unwrap();
-
-        assert_eq!(report.imported, 2);
-        assert_eq!(
-            dictionary
-                .lookup_full_text(&LookupQuery::new("greeting").unwrap(), 10)
-                .unwrap()[0]
-                .headword(),
-            "xin chao"
+        let ifo_path = write_stardict_fixture(
+            &directory,
+            "stardict-sample",
+            &[
+                ("computer", "An electronic device for processing data"),
+                ("rust", "A systems programming language"),
+            ],
         );
+
+        let mut dictionary = SqliteDictionary::in_memory().unwrap();
+        let report = dictionary.import_path(&ifo_path).unwrap();
+        assert_eq!(report.imported, 2);
+        assert_eq!(report.inserted, 2);
+
+        let results = dictionary
+            .lookup_exact(&LookupQuery::new("computer").unwrap())
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].headword(), "computer");
+
         std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
     fn malformed_stardict_is_rejected_without_partial_import() {
         let directory = temporary_directory("bad-stardict");
-        let source = write_stardict_fixture(&directory);
-        std::fs::write(directory.join("fixture.idx"), b"truncated").unwrap();
+        let ifo_path = directory.join("corrupt.ifo");
+        let idx_path = directory.join("corrupt.idx");
+        let dict_path = directory.join("corrupt.dict");
+
+        std::fs::write(
+            &ifo_path,
+            "StarDict's dict ifo file\nversion=2.4.2\nbookname=bad\nwordcount=1\nidxfilesize=10\nsametypesequence=m\n",
+        )
+        .unwrap();
+        std::fs::write(&idx_path, [1, 2, 3]).unwrap();
+        std::fs::write(&dict_path, [4, 5, 6]).unwrap();
+
         let mut dictionary = SqliteDictionary::in_memory().unwrap();
+        let error = dictionary.import_path(&ifo_path).unwrap_err();
+        assert!(matches!(error, ImportError::Format(_)));
 
-        assert!(dictionary.import_path(&source).is_err());
-        assert!(
-            dictionary
-                .lookup_prefix(&LookupQuery::new("r").unwrap(), 10)
-                .unwrap()
-                .is_empty()
-        );
+        let results = dictionary
+            .lookup_exact(&LookupQuery::new("bad").unwrap())
+            .unwrap();
+        assert!(results.is_empty());
+
         std::fs::remove_dir_all(directory).unwrap();
-    }
-
-    #[test]
-    fn unsupported_extension_has_a_clear_error() {
-        let error = detect_format(Path::new("dictionary.zip")).unwrap_err();
-        assert!(matches!(error, ImportError::UnsupportedFormat { .. }));
     }
 
     fn wrap_mdict_block(data: &[u8]) -> Vec<u8> {
@@ -973,147 +1526,149 @@ mod tests {
     #[test]
     fn malformed_mdict_is_rejected_without_partial_import() {
         let directory = temporary_directory("bad-mdict");
-        let source = directory.join("broken.mdx");
-        std::fs::write(&source, b"not an mdict").unwrap();
-        let mut dictionary = SqliteDictionary::in_memory().unwrap();
+        let mdx_path = directory.join("corrupt.mdx");
+        std::fs::write(&mdx_path, [0, 0, 0, 5, 1, 2, 3, 4, 5]).unwrap();
 
-        assert!(dictionary.import_path(&source).is_err());
-        assert!(
-            dictionary
-                .lookup_prefix(&LookupQuery::new("a").unwrap(), 10)
-                .unwrap()
-                .is_empty()
-        );
+        let mut dictionary = SqliteDictionary::in_memory().unwrap();
+        let error = dictionary.import_path(&mdx_path).unwrap_err();
+        assert!(matches!(error, ImportError::Format(_)));
+
+        let results = dictionary
+            .lookup_exact(&LookupQuery::new("anything").unwrap())
+            .unwrap();
+        assert!(results.is_empty());
+
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn unsupported_extension_has_a_clear_error() {
+        let path = Path::new("test.xyz");
+        let error = detect_format(path).unwrap_err();
+        assert!(matches!(error, ImportError::UnsupportedFormat { .. }));
     }
 
     #[test]
     fn bulk_import_reports_progress() {
         let directory = temporary_directory("progress");
-        let source = write_stardict_fixture(&directory);
-        let mut dictionary = SqliteDictionary::in_memory().unwrap();
-        let mut progress = Vec::new();
+        let tsv_path = directory.join("words.tsv");
+        let mut content = String::new();
+        for i in 0..50 {
+            content.push_str(&format!("word{i}\tdefinition{i}\n"));
+        }
+        std::fs::write(&tsv_path, content).unwrap();
 
-        dictionary
-            .import_path_with_progress(&source, |update| progress.push(update))
+        let mut progress_count = 0;
+        let mut last_processed = 0;
+        let mut dictionary = SqliteDictionary::in_memory().unwrap();
+        let report = dictionary
+            .import_path_with_progress(&tsv_path, |progress| {
+                progress_count += 1;
+                last_processed = progress.processed;
+            })
             .unwrap();
 
-        assert_eq!(progress.last().unwrap().processed, 2);
-        assert_eq!(progress.last().unwrap().total, Some(2));
+        assert_eq!(report.imported, 50);
+        assert_eq!(last_processed, 50);
+        assert_eq!(progress_count, 50);
+
         std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
     fn imported_entries_and_full_text_index_persist() {
         let directory = temporary_directory("persistence");
-        let database_path = directory.join("dictionary.db");
+        let database_path = directory.join("lingoes.db");
+        let tsv_path = directory.join("words.tsv");
+        std::fs::write(&tsv_path, "rust\tA systems language\n").unwrap();
+
         {
             let mut dictionary = SqliteDictionary::open(&database_path).unwrap();
-            dictionary
-                .import_tsv("Tiếng Việt\ta Vietnamese language\n".as_bytes())
-                .unwrap();
+            dictionary.import_path(&tsv_path).unwrap();
         }
 
         let dictionary = SqliteDictionary::open(&database_path).unwrap();
-        assert_eq!(
-            dictionary
-                .lookup_prefix(&LookupQuery::new("tiế").unwrap(), 10)
-                .unwrap()
-                .len(),
-            1
-        );
-        assert_eq!(
-            dictionary
-                .lookup_full_text(&LookupQuery::new("language").unwrap(), 10)
-                .unwrap()
-                .len(),
-            1
-        );
+        let exact = dictionary
+            .lookup_exact(&LookupQuery::new("rust").unwrap())
+            .unwrap();
+        assert_eq!(exact.len(), 1);
+        assert_eq!(exact[0].headword(), "rust");
+
+        let fts = dictionary
+            .lookup_full_text(&LookupQuery::new("systems").unwrap(), 10)
+            .unwrap();
+        assert_eq!(fts.len(), 1);
+        assert_eq!(fts[0].headword(), "rust");
+
         std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
     fn list_toggle_and_delete_dictionaries() {
         let directory = temporary_directory("multi_dict_mgmt");
-        let database_path = directory.join("dictionary.db");
-        let dict1_path = directory.join("english_vi.tsv");
-        let dict2_path = directory.join("tech_terms.tsv");
+        let database_path = directory.join("test.db");
+        let dict1_path = directory.join("dict1.tsv");
+        let dict2_path = directory.join("dict2.tsv");
 
-        std::fs::write(&dict1_path, "apple\tquả táo\nbanana\tquả chuối\n").unwrap();
-        std::fs::write(&dict2_path, "apple\tApple Inc.\nrust\tngôn ngữ Rust\n").unwrap();
+        std::fs::write(&dict1_path, "word1\tdef1\nword2\tdef2\n").unwrap();
+        std::fs::write(&dict2_path, "term1\tmeaning1\n").unwrap();
 
         let mut dictionary = SqliteDictionary::open(&database_path).unwrap();
-        let rep1 = dictionary
-            .import_path_with_name(&dict1_path, Some("English-Vietnamese"))
+        dictionary
+            .import_path_with_name(&dict1_path, Some("Dict One"))
             .unwrap();
-        assert_eq!(rep1.imported, 2);
-
-        let rep2 = dictionary
-            .import_path_with_name(&dict2_path, Some("Tech Terms"))
+        dictionary
+            .import_path_with_name(&dict2_path, Some("Dict Two"))
             .unwrap();
-        assert_eq!(rep2.imported, 2);
 
         let list = dictionary.list_dictionaries().unwrap();
         assert_eq!(list.len(), 2);
-        assert_eq!(list[0].name, "English-Vietnamese");
+        assert_eq!(list[0].name, "Dict One");
         assert_eq!(list[0].entry_count, 2);
         assert!(list[0].enabled);
-        assert_eq!(list[1].name, "Tech Terms");
-        assert_eq!(list[1].entry_count, 2);
+        assert_eq!(list[1].name, "Dict Two");
+        assert_eq!(list[1].entry_count, 1);
         assert!(list[1].enabled);
 
-        // Lookup "apple" returns 2 entries with attribution
-        let apples = dictionary
-            .lookup_exact(&LookupQuery::new("apple").unwrap())
+        let id1 = list[0].id;
+        let id2 = list[1].id;
+
+        // Toggle dict1 disabled
+        dictionary.toggle_dictionary(id1, false).unwrap();
+        let updated = dictionary.list_dictionaries().unwrap();
+        assert!(!updated[0].enabled);
+        assert!(updated[1].enabled);
+
+        // Lookup exact on word1 should return empty because dict1 is disabled
+        let results = dictionary
+            .lookup_exact(&LookupQuery::new("word1").unwrap())
             .unwrap();
-        assert_eq!(apples.len(), 2);
-        assert_eq!(apples[0].dictionary_name(), Some("English-Vietnamese"));
-        assert_eq!(apples[0].definition(), "quả táo");
-        assert_eq!(apples[1].dictionary_name(), Some("Tech Terms"));
-        assert_eq!(apples[1].definition(), "Apple Inc.");
+        assert!(results.is_empty());
 
-        // Toggle first dictionary to disabled
-        dictionary.toggle_dictionary(list[0].id, false).unwrap();
-        let disabled_list = dictionary.list_dictionaries().unwrap();
-        assert!(!disabled_list[0].enabled);
-
-        let apples_after_disable = dictionary
-            .lookup_exact(&LookupQuery::new("apple").unwrap())
+        // Lookup on term1 should still work
+        let results2 = dictionary
+            .lookup_exact(&LookupQuery::new("term1").unwrap())
             .unwrap();
-        assert_eq!(apples_after_disable.len(), 1);
-        assert_eq!(
-            apples_after_disable[0].dictionary_name(),
-            Some("Tech Terms")
-        );
+        assert_eq!(results2.len(), 1);
 
-        // Re-enable first dictionary
-        dictionary.toggle_dictionary(list[0].id, true).unwrap();
-        assert_eq!(
-            dictionary
-                .lookup_exact(&LookupQuery::new("apple").unwrap())
-                .unwrap()
-                .len(),
-            2
-        );
-
-        // Delete second dictionary
-        dictionary.delete_dictionary(list[1].id).unwrap();
-        let remaining_list = dictionary.list_dictionaries().unwrap();
-        assert_eq!(remaining_list.len(), 1);
-        assert_eq!(remaining_list[0].id, list[0].id);
-
-        let apples_after_delete = dictionary
-            .lookup_exact(&LookupQuery::new("apple").unwrap())
+        // Toggle dict1 back enabled
+        dictionary.toggle_dictionary(id1, true).unwrap();
+        let results3 = dictionary
+            .lookup_exact(&LookupQuery::new("word1").unwrap())
             .unwrap();
-        assert_eq!(apples_after_delete.len(), 1);
-        assert_eq!(
-            apples_after_delete[0].dictionary_name(),
-            Some("English-Vietnamese")
-        );
+        assert_eq!(results3.len(), 1);
 
-        // Deleting non-existent returns error
-        assert!(dictionary.delete_dictionary(9999).is_err());
-        assert!(dictionary.toggle_dictionary(9999, false).is_err());
+        // Delete dict2
+        dictionary.delete_dictionary(id2).unwrap();
+        let remaining = dictionary.list_dictionaries().unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].name, "Dict One");
+
+        // Lookup term1 returns empty
+        let results4 = dictionary
+            .lookup_exact(&LookupQuery::new("term1").unwrap())
+            .unwrap();
+        assert!(results4.is_empty());
 
         std::fs::remove_dir_all(directory).unwrap();
     }

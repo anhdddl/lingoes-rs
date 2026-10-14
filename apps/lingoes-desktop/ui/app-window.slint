@@ -31,6 +31,12 @@ export component AppWindow inherits Window {
     in property <string> selected-headword;
     in property <string> selected-definition;
     in property <string> selected-dict-badge;
+    in property <bool> can-go-back: false;
+    in property <bool> can-go-forward: false;
+    in-out property <bool> private-mode: false;
+    in-out property <int> active-group-index: 0;
+    in-out property <bool> show-history-tab: false;
+    in property <[string]> history-items;
 
     // Tab 1: Translate
     in-out property <string> translate-source-text;

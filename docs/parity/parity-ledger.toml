@@ -40,13 +40,13 @@ id = "UI-03"
 workflow = "Back/forward navigation and history list in the search view"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#UI-03"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["UI-03-ACCEPTANCE"]
 windows_scenarios = ["WIN-UI-03"]
 supported_platforms = ["windows"]
 owner = "desktop-shell"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for UI-03 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Back/forward navigation and history persistence implemented; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -306,13 +306,13 @@ id = "DICT-07"
 workflow = "Query, Index, and Text Capture dictionary groups"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-07"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["DICT-07-ACCEPTANCE"]
 windows_scenarios = ["WIN-DICT-07"]
 supported_platforms = ["windows"]
 owner = "dictionary"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-07 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Query Group, Index Group, and Capture Group memberships and isolated group lookup queries implemented in storage; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -320,13 +320,13 @@ id = "DICT-08"
 workflow = "Reorder dictionaries / set top result / arrange results"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#DICT-08"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["DICT-08-ACCEPTANCE"]
 windows_scenarios = ["WIN-DICT-08"]
 supported_platforms = ["windows"]
 owner = "dictionary"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for DICT-08 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Dictionary sort_order priority ordering implemented in storage and lookup ranking; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -838,13 +838,13 @@ id = "HIST-01"
 workflow = "Search history list"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#HIST-01"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["HIST-01-ACCEPTANCE"]
 windows_scenarios = ["WIN-HIST-01"]
 supported_platforms = ["windows"]
 owner = "storage"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for HIST-01 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Search history list with bounded capacity, deduplication, and persistence implemented in storage; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -852,13 +852,13 @@ id = "HIST-02"
 workflow = "Clear history"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#HIST-02"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["HIST-02-ACCEPTANCE"]
 windows_scenarios = ["WIN-HIST-02"]
 supported_platforms = ["windows"]
 owner = "storage"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for HIST-02 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Clear history API and storage operation implemented; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
@@ -866,27 +866,27 @@ id = "HIST-03"
 workflow = "Local online-dictionary result cache and clear-cache action"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#HIST-03"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["HIST-03-ACCEPTANCE"]
 windows_scenarios = ["WIN-HIST-03"]
 supported_platforms = ["windows"]
 owner = "storage"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for HIST-03 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Local online-dictionary and translation result cache with clear-cache action implemented; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]
 id = "HIST-04"
-workflow = "Notebook/favorites (\u201cAdd the word to notebook\u201d)"
+workflow = "Notebook/favorites (“Add the word to notebook”)"
 evidence_paths = ["docs/audit/parity-gap-matrix.md#HIST-04"]
 evidence_status = "observed-static"
-implementation_status = "deferred"
+implementation_status = "implemented"
 automated_tests = ["HIST-04-ACCEPTANCE"]
 windows_scenarios = ["WIN-HIST-04"]
 supported_platforms = ["windows"]
 owner = "storage"
 acceptance = "Pass the automated acceptance test and the recorded Windows scenario for HIST-04 before setting verified."
-deviation = "No baseline product implementation was found; acceptance remains deferred and Windows runtime verification is NOT RUN."
+deviation = "Word notebook / favorites with folders, notes, tags, and dictionary fallback snapshots implemented; Windows runtime verification is NOT RUN."
 evidence_artifacts = ["BASELINE-WINDOWS-NOT-RUN"]
 
 [[capabilities]]

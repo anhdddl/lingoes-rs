@@ -8,9 +8,12 @@ rust-version.workspace = true
 [dependencies]
 lingoes-core.workspace = true
 opendict-rs = "0.1.0"
-rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite = { version = "0.37", features = ["bundled", "backup"] }
 thiserror.workspace = true
 
 [dev-dependencies]
 adler2 = "2"
 flate2 = "1"
+proptest = "1"
+tempfile = "3.15"
+unicode-normalization.workspace = true
