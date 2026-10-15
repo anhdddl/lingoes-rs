@@ -24,11 +24,13 @@ export struct FormattedEntryLine {
 
 component ClassicButton inherits Rectangle {
     in property <string> text;
+    in property <image> icon;
+    in property <bool> has-icon: false;
     in property <bool> enabled: true;
     in property <bool> selected: false;
     callback clicked;
     height: 23px;
-    min-width: 44px;
+    min-width: 26px;
     border-radius: 3px;
     background: !root.enabled ? #edf2f6 : hit.pressed ? @linear-gradient(180deg, #8ebada 0%, #c7e0f3 100%) : root.selected ? @linear-gradient(180deg, #d9ecfa 0%, #a8d0ef 100%) : hit.has-hover ? @linear-gradient(180deg, #ffffff 0%, #dceaf7 100%) : @linear-gradient(180deg, #fcfdfe 0%, #e2ecf6 100%);
     border-color: !root.enabled ? #c5d5e2 : hit.pressed ? #286b9f : root.selected ? #3f80ab : hit.has-hover ? #5b8cb4 : #88a7c2;
@@ -36,18 +38,25 @@ component ClassicButton inherits Rectangle {
     drop-shadow-blur: 1px;
     drop-shadow-offset-y: 1px;
     drop-shadow-color: #00000010;
-    Text {
-        text: root.text;
-        color: root.enabled ? (root.selected ? #0b375d : #174d7b) : #8da0b0;
-        font-family: "Noto Sans";
-        font-size: 11px;
-        font-weight: root.selected ? 700 : 400;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-        x: 4px;
-        width: parent.width - 8px;
-        height: parent.height;
-        overflow: elide;
+    HorizontalLayout {
+        padding-left: 4px;
+        padding-right: 4px;
+        spacing: 4px;
+        alignment: center;
+        if root.has-icon : Image {
+            source: root.icon;
+            width: 14px;
+            height: 14px;
+            vertical-alignment: center;
+        }
+        if root.text != "" : Text {
+            text: root.text;
+            color: root.enabled ? (root.selected ? #0b375d : #174d7b) : #8da0b0;
+            font-family: "Noto Sans";
+            font-size: 11px;
+            font-weight: root.selected ? 700 : 400;
+            vertical-alignment: center;
+        }
     }
     hit := TouchArea {
         enabled: root.enabled;
@@ -57,6 +66,8 @@ component ClassicButton inherits Rectangle {
 
 component CircleNavButton inherits Rectangle {
     in property <string> text;
+    in property <image> icon;
+    in property <bool> has-icon: false;
     in property <bool> enabled: true;
     callback clicked;
     width: 25px;
@@ -68,7 +79,14 @@ component CircleNavButton inherits Rectangle {
     drop-shadow-blur: 2px;
     drop-shadow-offset-y: 1px;
     drop-shadow-color: #00000018;
-    Text {
+    if root.has-icon : Image {
+        source: root.icon;
+        width: 16px;
+        height: 16px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+    }
+    if !root.has-icon : Text {
         text: root.text;
         color: root.enabled ? #174d7b : #9cb1c2;
         font-family: "Noto Sans";
@@ -84,14 +102,14 @@ component CircleNavButton inherits Rectangle {
 }
 
 component BookIcon inherits Rectangle {
-    width: 15px;
-    height: 13px;
+    width: 16px;
+    height: 16px;
     background: transparent;
-    Rectangle { x: 1px; y: 2px; width: 6px; height: 9px; background: #f8fbfd; border-color: #2b669a; border-width: 1px; border-radius: 1px; }
-    Rectangle { x: 8px; y: 2px; width: 6px; height: 9px; background: #f8fbfd; border-color: #2b669a; border-width: 1px; border-radius: 1px; }
-    Rectangle { x: 7px; y: 1px; width: 1px; height: 11px; background: #2b669a; }
-    Rectangle { x: 3px; y: 4px; width: 3px; height: 1px; background: #92b7d6; }
-    Rectangle { x: 9px; y: 4px; width: 3px; height: 1px; background: #92b7d6; }
+    Image {
+        source: @image-url("assets/search_book.png");
+        width: 16px;
+        height: 16px;
+    }
 }
 
 component SearchActionButton inherits Rectangle {
@@ -109,16 +127,12 @@ component SearchActionButton inherits Rectangle {
     drop-shadow-blur: 2px;
     drop-shadow-offset-y: 1px;
     drop-shadow-color: #00000025;
-    Text {
-        text: root.text;
-        color: white;
-        font-family: "Noto Sans";
-        font-size: 11px;
-        font-weight: 700;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-        x: 4px;
-        width: parent.width - 8px;
+    Image {
+        source: @image-url("assets/search_go.png");
+        width: 16px;
+        height: 16px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
     }
     hit := TouchArea {
         enabled: root.enabled;
@@ -348,10 +362,10 @@ export component AppWindow inherits Window {
                 spacing: 8px;
                 // Parrot emblem
                 Image {
-                    source: @image-url("assets/lingoes_icon.png");
-                    width: 18px;
-                    height: 18px;
-                    y: 3px;
+                    source: @image-url("assets/parrot_logo.png");
+                    width: 20px;
+                    height: 20px;
+                    y: 2px;
                 }
                 Text {
                     text: "LINGOES";
@@ -475,12 +489,14 @@ export component AppWindow inherits Window {
                 padding-bottom: 4px;
                 spacing: 5px;
                 CircleNavButton {
-                    text: "◄";
+                    has-icon: true;
+                    icon: @image-url("assets/nav_back.png");
                     enabled: root.can-go-back;
                     clicked => { root.navigate-back(); }
                 }
                 CircleNavButton {
-                    text: "►";
+                    has-icon: true;
+                    icon: @image-url("assets/nav_forward.png");
                     enabled: root.can-go-forward;
                     clicked => { root.navigate-forward(); }
                 }
@@ -547,10 +563,10 @@ export component AppWindow inherits Window {
                             vertical-alignment: center;
                             horizontal-stretch: 1;
                         }
-                        Text {
-                            text: "🔍";
-                            color: #2173b5;
-                            font-size: 10px;
+                        Image {
+                            source: @image-url("assets/act_find.png");
+                            width: 13px;
+                            height: 13px;
                             vertical-alignment: center;
                         }
                     }
@@ -636,33 +652,38 @@ export component AppWindow inherits Window {
                                 padding-top: 6px;
                                 spacing: 4px;
                                 ClassicButton {
-                                    text: "📖";
+                                    has-icon: true;
+                                    icon: @image-url("assets/rail_index.png");
                                     width: 26px;
                                     height: 24px;
                                     selected: !root.show-history-tab;
                                     clicked => { root.show-history-tab = false; }
                                 }
                                 ClassicButton {
-                                    text: "🕒";
+                                    has-icon: true;
+                                    icon: @image-url("assets/rail_history.png");
                                     width: 26px;
                                     height: 24px;
                                     selected: root.show-history-tab;
                                     clicked => { root.show-history-tab = true; }
                                 }
                                 ClassicButton {
-                                    text: "🌐";
+                                    has-icon: true;
+                                    icon: @image-url("assets/rail_translate.png");
                                     width: 26px;
                                     height: 24px;
                                     clicked => { root.active-tab = 1; }
                                 }
                                 ClassicButton {
-                                    text: "📚";
+                                    has-icon: true;
+                                    icon: @image-url("assets/rail_dicts.png");
                                     width: 26px;
                                     height: 24px;
                                     clicked => { root.active-tab = 2; }
                                 }
                                 ClassicButton {
-                                    text: "⚙";
+                                    has-icon: true;
+                                    icon: @image-url("assets/rail_settings.png");
                                     width: 26px;
                                     height: 24px;
                                     clicked => { root.active-tab = 3; }
@@ -687,11 +708,11 @@ export component AppWindow inherits Window {
                                         HorizontalLayout {
                                             padding-left: 6px;
                                             padding-right: 6px;
-                                            spacing: 4px;
-                                            Text {
-                                                text: "🕒";
-                                                color: #708fa8;
-                                                font-size: 9px;
+                                            spacing: 5px;
+                                            Image {
+                                                source: @image-url("assets/rail_history.png");
+                                                width: 13px;
+                                                height: 13px;
                                                 vertical-alignment: center;
                                             }
                                             Text {
@@ -721,10 +742,11 @@ export component AppWindow inherits Window {
                                         HorizontalLayout {
                                             padding-left: 6px;
                                             padding-right: 6px;
-                                            spacing: 4px;
-                                            Text {
-                                                text: "📖";
-                                                font-size: 9px;
+                                            spacing: 5px;
+                                            Image {
+                                                source: @image-url("assets/search_book.png");
+                                                width: 13px;
+                                                height: 13px;
                                                 vertical-alignment: center;
                                             }
                                             Text {
@@ -769,14 +791,21 @@ export component AppWindow inherits Window {
                                     }
                                     Rectangle { vertical-stretch: 1; }
                                     HorizontalLayout {
+                                        spacing: 4px;
+                                        Image {
+                                            source: @image-url("assets/icon_trash.png");
+                                            width: 12px;
+                                            height: 12px;
+                                            vertical-alignment: center;
+                                        }
                                         Text {
-                                            text: root.ui-lang == "vi" ? "🗑 Xóa lịch sử" : "🗑 Clear history";
+                                            text: root.ui-lang == "vi" ? "Xóa lịch sử" : "Clear history";
                                             font-family: "Noto Sans";
                                             font-size: 10px;
                                             color: #216ba5;
-                                            TouchArea { clicked => { root.clear-history(); } }
                                         }
                                         Rectangle { horizontal-stretch: 1; }
+                                        TouchArea { clicked => { root.clear-history(); } }
                                     }
                                 }
                             }
@@ -815,31 +844,41 @@ export component AppWindow inherits Window {
                                     horizontal-stretch: 1;
                                 }
                                 ClassicButton {
-                                    text: root.ui-lang == "vi" ? "🔊 Phát âm" : "🔊 Speak";
+                                    has-icon: true;
+                                    icon: @image-url("assets/act_speaker.png");
+                                    text: root.ui-lang == "vi" ? "Phát âm" : "Speak";
                                     width: root.ui-lang == "vi" ? 76px : 68px;
                                     enabled: root.selected-headword != "";
                                     clicked => { root.speak(root.selected-headword, "en"); }
                                 }
                                 ClassicButton {
-                                    text: root.ui-lang == "vi" ? "⏹ Dừng" : "⏹ Stop";
-                                    width: root.ui-lang == "vi" ? 58px : 52px;
+                                    has-icon: true;
+                                    icon: @image-url("assets/act_stop.png");
+                                    text: root.ui-lang == "vi" ? "Dừng" : "Stop";
+                                    width: root.ui-lang == "vi" ? 60px : 54px;
                                     clicked => { root.stop-tts(); }
                                 }
                                 ClassicButton {
-                                    text: root.ui-lang == "vi" ? "📋 Sao chép" : "📋 Copy";
-                                    width: root.ui-lang == "vi" ? 78px : 60px;
+                                    has-icon: true;
+                                    icon: @image-url("assets/act_copy.png");
+                                    text: root.ui-lang == "vi" ? "Sao chép" : "Copy";
+                                    width: root.ui-lang == "vi" ? 78px : 62px;
                                     enabled: root.selected-headword != "";
                                     clicked => { root.copy-to-clipboard(root.selected-headword + "\\n" + root.selected-definition); }
                                 }
                                 ClassicButton {
-                                    text: root.ui-lang == "vi" ? "💾 Lưu" : "💾 Save";
-                                    width: 52px;
+                                    has-icon: true;
+                                    icon: @image-url("assets/act_save.png");
+                                    text: root.ui-lang == "vi" ? "Lưu" : "Save";
+                                    width: 54px;
                                     enabled: root.selected-headword != "";
                                     clicked => { root.export-result-html(); }
                                 }
                                 ClassicButton {
-                                    text: root.ui-lang == "vi" ? "🔍 FTS" : "🔍 Find";
-                                    width: 52px;
+                                    has-icon: true;
+                                    icon: @image-url("assets/act_find.png");
+                                    text: root.ui-lang == "vi" ? "FTS" : "Find";
+                                    width: 54px;
                                     clicked => { root.full-text-search(root.query); }
                                 }
                             }
