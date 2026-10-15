@@ -2,6 +2,33 @@ import "./fonts/NotoSans-Regular.ttf";
 import "./fonts/NotoSans-Bold.ttf";
 import { CheckBox, LineEdit, ListView, ScrollView, TextEdit } from "std-widgets.slint";
 
+
+export struct IrregularVerbItem {
+    v1: string,
+    v2: string,
+    v3: string,
+    meaning: string,
+}
+
+export struct DialingCodeItem {
+    country: string,
+    code: string,
+    flag: string,
+}
+
+export struct IpaItem {
+    symbol: string,
+    category: string,
+    sample-word: string,
+    sample-ipa: string,
+    description: string,
+}
+
+export struct UnitRow {
+    name: string,
+    symbol: string,
+    value-str: string,
+}
 export struct SearchResult {
     headword: string,
     definition: string,
@@ -308,6 +335,28 @@ export component AppWindow inherits Window {
     background: #fffdf0;
 
     in-out property <string> ui-lang: "vi";
+    // Word Notebook / Favorites
+    in property <[string]> notebook-items: [];
+    in property <bool> is-current-favorite: false;
+    in-out property <int> sidebar-mode: 0; // 0: Results, 1: History, 2: Notebook
+    callback toggle-notebook(string, string);
+    callback remove-notebook-item(string);
+    callback export-notebook();
+
+    // Appendices & Reference Tools
+    in property <[IrregularVerbItem]> irregular-verbs: [];
+    in property <[DialingCodeItem]> dialing-codes: [];
+    in property <[IpaItem]> ipa-symbols: [];
+    in property <[UnitRow]> unit-rows: [];
+    in-out property <string> irregular-query: "";
+    in-out property <string> dialing-query: "";
+    in-out property <int> appendix-sub-tab: 0; // 0: Verbs, 1: Unit Converter, 2: IPA, 3: Dialing Codes
+    in-out property <string> unit-category: "length";
+    in-out property <string> unit-source: "m";
+    in-out property <string> unit-input-val: "100";
+    callback search-irregular-verbs(string);
+    callback search-dialing-codes(string);
+    callback update-unit-conversions(string, string, string);
     in-out property <int> active-tab: 0;
     in-out property <int> active-menu: 0;
     in-out property <bool> show-about-dialog: false;
@@ -626,14 +675,19 @@ export component AppWindow inherits Window {
                     clicked => { root.active-tab = 1; }
                 }
                 TopTabButton {
-                    text: root.ui-lang == "vi" ? "Từ điển" : "Dictionaries";
+                    text: root.ui-lang == "vi" ? "Phụ lục" : "Appendices";
                     selected: root.active-tab == 2;
                     clicked => { root.active-tab = 2; }
                 }
                 TopTabButton {
-                    text: root.ui-lang == "vi" ? "Cài đặt" : "Settings";
+                    text: root.ui-lang == "vi" ? "Từ điển" : "Dictionaries";
                     selected: root.active-tab == 3;
                     clicked => { root.active-tab = 3; }
+                }
+                TopTabButton {
+                    text: root.ui-lang == "vi" ? "Cài đặt" : "Settings";
+                    selected: root.active-tab == 4;
+                    clicked => { root.active-tab = 4; }
                 }
                 Rectangle { width: 1px; background: #9db7cc; y: 3px; height: 21px; }
                 TopTabButton {
@@ -686,37 +740,56 @@ export component AppWindow inherits Window {
                                     alignment: center;
                                     RailButton {
                                         icon: @image-url("assets/rail_index.png");
-                                        selected: !root.show-history-tab;
-                                        clicked => { root.show-history-tab = false; }
+                                        selected: root.sidebar-mode == 0 && root.active-tab == 0;
+                                        clicked => { root.sidebar-mode = 0; root.show-history-tab = false; root.active-tab = 0; }
                                     }
                                 }
                                 HorizontalLayout {
                                     alignment: center;
                                     RailButton {
                                         icon: @image-url("assets/rail_history.png");
-                                        selected: root.show-history-tab;
-                                        clicked => { root.show-history-tab = true; }
+                                        selected: root.sidebar-mode == 1 && root.active-tab == 0;
+                                        clicked => { root.sidebar-mode = 1; root.show-history-tab = true; root.active-tab = 0; }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    alignment: center;
+                                    RailButton {
+                                        icon: @image-url("assets/rail_star.png");
+                                        selected: root.sidebar-mode == 2 && root.active-tab == 0;
+                                        clicked => { root.sidebar-mode = 2; root.active-tab = 0; }
                                     }
                                 }
                                 HorizontalLayout {
                                     alignment: center;
                                     RailButton {
                                         icon: @image-url("assets/rail_translate.png");
+                                        selected: root.active-tab == 1;
                                         clicked => { root.active-tab = 1; }
                                     }
                                 }
                                 HorizontalLayout {
                                     alignment: center;
                                     RailButton {
-                                        icon: @image-url("assets/rail_dicts.png");
+                                        icon: @image-url("assets/rail_appendix.png");
+                                        selected: root.active-tab == 2;
                                         clicked => { root.active-tab = 2; }
                                     }
                                 }
                                 HorizontalLayout {
                                     alignment: center;
                                     RailButton {
-                                        icon: @image-url("assets/rail_settings.png");
+                                        icon: @image-url("assets/rail_dicts.png");
+                                        selected: root.active-tab == 3;
                                         clicked => { root.active-tab = 3; }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    alignment: center;
+                                    RailButton {
+                                        icon: @image-url("assets/rail_settings.png");
+                                        selected: root.active-tab == 4;
+                                        clicked => { root.active-tab = 4; }
                                     }
                                 }
                             }
@@ -726,16 +799,22 @@ export component AppWindow inherits Window {
                         VerticalLayout {
                             spacing: 0px;
                             SectionTitle {
-                                text: root.show-history-tab ? (root.ui-lang == "vi" ? "Lịch sử tra cứu" : "Search History") : (root.ui-lang == "vi" ? "Kết quả tìm kiếm" : "Search Results");
+                                text: root.sidebar-mode == 0 ? (root.ui-lang == "vi" ? "Kết quả tìm kiếm" : "Search Results") : root.sidebar-mode == 1 ? (root.ui-lang == "vi" ? "Lịch sử tra cứu" : "Search History") : (root.ui-lang == "vi" ? "Sổ tay từ vựng" : "Word Notebook");
                                 height: 25px;
                             }
                             Rectangle {
                                 vertical-stretch: 1;
                                 background: white;
-                                if root.show-history-tab : ListView {
+                                if root.sidebar-mode == 1 : ListView {
                                     for item in root.history-items : Rectangle {
                                         height: 24px;
                                         background: hhit.has-hover ? #f2f7fc : white;
+                                        hhit := TouchArea {
+                                            clicked => {
+                                                root.query = item;
+                                                root.search(item);
+                                            }
+                                        }
                                         HorizontalLayout {
                                             padding-left: 6px;
                                             padding-right: 6px;
@@ -759,20 +838,75 @@ export component AppWindow inherits Window {
                                                 horizontal-stretch: 1;
                                             }
                                         }
-                                        hhit := TouchArea {
+                                    }
+                                }
+                                if root.sidebar-mode == 2 : ListView {
+                                    for item in root.notebook-items : Rectangle {
+                                        height: 24px;
+                                        background: nhit.has-hover ? #fefce8 : white;
+                                        border-color: #fef08a;
+                                        border-width: 1px;
+                                        nhit := TouchArea {
                                             clicked => {
                                                 root.query = item;
                                                 root.search(item);
                                             }
                                         }
+                                        HorizontalLayout {
+                                            padding-left: 6px;
+                                            padding-right: 6px;
+                                            spacing: 5px;
+                                            Rectangle {
+                                                width: 13px;
+                                                Image {
+                                                    source: @image-url("assets/act_star.png");
+                                                    width: 13px;
+                                                    height: 13px;
+                                                    y: (parent.height - self.height) / 2;
+                                                }
+                                            }
+                                            Text {
+                                                text: item;
+                                                color: #1e3a8a;
+                                                font-family: "Noto Sans";
+                                                font-size: 11px;
+                                                font-weight: 600;
+                                                vertical-alignment: center;
+                                                overflow: elide;
+                                                horizontal-stretch: 1;
+                                            }
+                                            Rectangle {
+                                                width: 16px;
+                                                height: 16px;
+                                                border-radius: 2px;
+                                                background: delhit.has-hover ? #fee2e2 : transparent;
+                                                border-color: delhit.has-hover ? #fca5a5 : transparent;
+                                                border-width: 1px;
+                                                y: (parent.height - self.height) / 2;
+                                                Text {
+                                                    text: "×";
+                                                    font-size: 13px;
+                                                    font-weight: 700;
+                                                    color: delhit.has-hover ? #ef4444 : #94a3b8;
+                                                    horizontal-alignment: center;
+                                                    vertical-alignment: center;
+                                                }
+                                                delhit := TouchArea {
+                                                    clicked => { root.remove-notebook-item(item); }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
-                                if !root.show-history-tab : ListView {
+                                if root.sidebar-mode == 0 : ListView {
                                     for result[index] in root.results : Rectangle {
                                         height: 24px;
                                         background: index == root.selected-index ? @linear-gradient(180deg, #e3f0fb 0%, #cde4f7 100%) : rhit.has-hover ? #f4f9fd : white;
                                         border-color: index == root.selected-index ? #7caad0 : #edf2f5;
                                         border-width: 1px;
+                                        rhit := TouchArea {
+                                            clicked => { root.select-result(index); }
+                                        }
                                         HorizontalLayout {
                                             padding-left: 6px;
                                             padding-right: 6px;
@@ -797,9 +931,6 @@ export component AppWindow inherits Window {
                                                 horizontal-stretch: 1;
                                             }
                                         }
-                                        rhit := TouchArea {
-                                            clicked => { root.select-result(index); }
-                                        }
                                     }
                                 }
                             }
@@ -817,13 +948,13 @@ export component AppWindow inherits Window {
                                     padding-bottom: 6px;
                                     spacing: 4px;
                                     Text {
-                                        text: root.ui-lang == "vi" ? "• Khớp chính xác & tiền tố" : "• Exact & prefix match";
+                                        text: root.sidebar-mode == 0 ? (root.ui-lang == "vi" ? "• Khớp chính xác & tiền tố" : "• Exact & prefix match") : root.sidebar-mode == 1 ? (root.ui-lang == "vi" ? "• Nhật ký các từ đã tra" : "• Recent searched items") : (root.ui-lang == "vi" ? "• Danh mục từ vựng yêu thích" : "• Saved favorite terms");
                                         font-family: "Noto Sans";
                                         font-size: 10px;
                                         color: #58758b;
                                     }
                                     Text {
-                                        text: "• " + root.results.length + (root.ui-lang == "vi" ? " mục tìm thấy" : " matches found");
+                                        text: root.sidebar-mode == 0 ? ("• " + root.results.length + (root.ui-lang == "vi" ? " mục tìm thấy" : " matches found")) : root.sidebar-mode == 1 ? ("• " + root.history-items.length + (root.ui-lang == "vi" ? " mục trong lịch sử" : " history items")) : ("• " + root.notebook-items.length + (root.ui-lang == "vi" ? " từ trong sổ tay" : " saved terms"));
                                         font-family: "Noto Sans";
                                         font-size: 10px;
                                         font-weight: 700;
@@ -832,7 +963,7 @@ export component AppWindow inherits Window {
                                     Rectangle { vertical-stretch: 1; }
                                     HorizontalLayout {
                                         spacing: 5px;
-                                        Rectangle {
+                                        if root.sidebar-mode != 2 : Rectangle {
                                             width: 12px;
                                             Image {
                                                 source: @image-url("assets/icon_trash.png");
@@ -841,15 +972,32 @@ export component AppWindow inherits Window {
                                                 y: (parent.height - self.height) / 2;
                                             }
                                         }
+                                        if root.sidebar-mode == 2 : Rectangle {
+                                            width: 12px;
+                                            Image {
+                                                source: @image-url("assets/act_star.png");
+                                                width: 12px;
+                                                height: 12px;
+                                                y: (parent.height - self.height) / 2;
+                                            }
+                                        }
                                         Text {
-                                            text: root.ui-lang == "vi" ? "Xóa lịch sử" : "Clear history";
+                                            text: root.sidebar-mode == 2 ? (root.ui-lang == "vi" ? "Xuất sổ tay (HTML)" : "Export HTML") : (root.ui-lang == "vi" ? "Xóa lịch sử" : "Clear history");
                                             font-family: "Noto Sans";
                                             font-size: 10px;
                                             color: #216ba5;
                                             vertical-alignment: center;
                                         }
                                         Rectangle { horizontal-stretch: 1; }
-                                        TouchArea { clicked => { root.clear-history(); } }
+                                        TouchArea {
+                                            clicked => {
+                                                if root.sidebar-mode == 2 {
+                                                    root.export-notebook();
+                                                } else {
+                                                    root.clear-history();
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -922,6 +1070,14 @@ export component AppWindow inherits Window {
                                     text: root.ui-lang == "vi" ? "Lưu" : "Save";
                                     enabled: root.selected-headword != "";
                                     clicked => { root.export-result-html(); }
+                                }
+                                ClassicButton {
+                                    y: 3px;
+                                    has-icon: true;
+                                    icon: @image-url("assets/act_star.png");
+                                    text: root.is-current-favorite ? (root.ui-lang == "vi" ? "Đã lưu" : "Favorited") : (root.ui-lang == "vi" ? "Sổ từ vựng" : "Notebook");
+                                    enabled: root.selected-headword != "";
+                                    clicked => { root.toggle-notebook(root.selected-headword, root.selected-definition); }
                                 }
                                 ClassicButton {
                                     y: 3px;
@@ -1107,12 +1263,32 @@ export component AppWindow inherits Window {
                                             }
                                             Text {
                                                 text: root.ui-lang == "vi"
-                                                    ? "• Nhập từ hoặc cụm từ vào ô tìm kiếm ở trên, sau đó nhấn Enter hoặc bấm Tra từ (▶).\n• Hỗ trợ gõ tiếng Việt có dấu và không dấu (vd: chao co -> chào cờ).\n• Sử dụng danh sách Kết quả hoặc Lịch sử bên trái.\n• Quản lý và nạp thêm từ điển tại thẻ Quản lý từ điển."
-                                                    : "• Enter a word or phrase in the search box above, then press Enter or click Search (▶).\n• Accent-insensitive Vietnamese typing supported (e.g. chao co -> chào cờ).\n• Browse search results or history on the left sidebar.\n• Manage and install additional dictionaries from the Dictionaries tab.";
+                                                    ? "• Nhập từ hoặc cụm từ vào ô tìm kiếm ở trên, sau đó nhấn Enter hoặc bấm Tra từ (▶).\n• Hỗ trợ gõ tiếng Việt có dấu và không dấu (vd: chao co -> chào cờ).\n• Sử dụng danh sách Kết quả, Lịch sử hoặc Sổ tay từ vựng bên trái.\n• Tra cứu Bảng động từ bất quy tắc, Quy đổi đơn vị, Ký hiệu ngữ âm IPA tại thẻ Phụ lục."
+                                                    : "• Enter a word or phrase in the search box above, then press Enter or click Search (▶).\n• Accent-insensitive Vietnamese typing supported (e.g. chao co -> chào cờ).\n• Browse search results, history, or word notebook on the left sidebar.\n• Access Irregular Verbs, Unit Converter, and IPA Phonetics from the Appendices tab.";
                                                 font-family: "Noto Sans";
                                                 font-size: 11px;
                                                 color: #436480;
                                                 wrap: word-wrap;
+                                            }
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                ClassicButton {
+                                                    text: root.ui-lang == "vi" ? "⭐ Sổ tay từ vựng" : "⭐ Word Notebook";
+                                                    clicked => { root.sidebar-mode = 2; }
+                                                }
+                                                ClassicButton {
+                                                    text: root.ui-lang == "vi" ? "🧰 Động từ bất quy tắc" : "🧰 Irregular Verbs";
+                                                    clicked => { root.active-tab = 2; root.appendix-sub-tab = 0; }
+                                                }
+                                                ClassicButton {
+                                                    text: root.ui-lang == "vi" ? "📏 Quy đổi đơn vị" : "📏 Unit Converter";
+                                                    clicked => { root.active-tab = 2; root.appendix-sub-tab = 1; }
+                                                }
+                                                ClassicButton {
+                                                    text: root.ui-lang == "vi" ? "🗣 Bảng ngữ âm IPA" : "🗣 IPA Chart";
+                                                    clicked => { root.active-tab = 2; root.appendix-sub-tab = 2; }
+                                                }
+                                                Rectangle { horizontal-stretch: 1; }
                                             }
                                         }
                                     }
@@ -1204,8 +1380,437 @@ export component AppWindow inherits Window {
                 }
             }
 
-            // TAB 2: DICTIONARIES
+                        // TAB 2: APPENDICES (PHỤ LỤC & CÔNG CỤ TIỆN ÍCH)
             if root.active-tab == 2 : VerticalLayout {
+                padding: 8px;
+                spacing: 6px;
+                SectionTitle { text: root.ui-lang == "vi" ? "Phụ lục & Tiện ích tra cứu Lingoes" : "Lingoes Appendices & Reference Tools"; }
+
+                // Sub-tabs bar
+                Rectangle {
+                    height: 28px;
+                    background: @linear-gradient(180deg, #f0f6fa 0%, #d8e8f4 100%);
+                    border-color: #9cb8ce;
+                    border-width: 1px;
+                    border-radius: 2px;
+                    HorizontalLayout {
+                        padding-left: 4px;
+                        padding-right: 4px;
+                        spacing: 4px;
+                        TopTabButton {
+                            text: root.ui-lang == "vi" ? "Động từ bất quy tắc (359)" : "Irregular Verbs (359)";
+                            selected: root.appendix-sub-tab == 0;
+                            clicked => { root.appendix-sub-tab = 0; }
+                        }
+                        TopTabButton {
+                            text: root.ui-lang == "vi" ? "Quy đổi đơn vị" : "Unit Converter";
+                            selected: root.appendix-sub-tab == 1;
+                            clicked => { root.appendix-sub-tab = 1; }
+                        }
+                        TopTabButton {
+                            text: root.ui-lang == "vi" ? "Bảng ngữ âm IPA (44)" : "IPA Phonetic Chart (44)";
+                            selected: root.appendix-sub-tab == 2;
+                            clicked => { root.appendix-sub-tab = 2; }
+                        }
+                        TopTabButton {
+                            text: root.ui-lang == "vi" ? "Mã vùng điện thoại (43)" : "Dialing Codes (43)";
+                            selected: root.appendix-sub-tab == 3;
+                            clicked => { root.appendix-sub-tab = 3; }
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                    }
+                }
+
+                // Sub-tab 0: Irregular Verbs
+                if root.appendix-sub-tab == 0 : VerticalLayout {
+                    spacing: 4px;
+                    HorizontalLayout {
+                        height: 26px;
+                        spacing: 6px;
+                        Text {
+                            text: root.ui-lang == "vi" ? "Lọc động từ:" : "Filter verbs:";
+                            font-family: "Noto Sans";
+                            font-size: 11px;
+                            color: #174d7b;
+                            vertical-alignment: center;
+                        }
+                        LineEdit {
+                            text <=> root.irregular-query;
+                            placeholder-text: root.ui-lang == "vi" ? "Gõ V1, V2, V3 hoặc nghĩa tiếng Việt (vd: go, went, gone, bay, thức...)" : "Type V1, V2, V3 or meaning (e.g. go, see, write...)";
+                            edited => { root.search-irregular-verbs(self.text); }
+                            horizontal-stretch: 1;
+                        }
+                    }
+
+                    // Table Header
+                    Rectangle {
+                        height: 24px;
+                        background: #e2eef7;
+                        border-color: #b0c8dc;
+                        border-width: 1px;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 8px;
+                            Text { width: 130px; text: root.ui-lang == "vi" ? "Nguyên thể (V1)" : "Infinitive (V1)"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; }
+                            Text { width: 130px; text: root.ui-lang == "vi" ? "Quá khứ đơn (V2)" : "Past Simple (V2)"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; }
+                            Text { width: 150px; text: root.ui-lang == "vi" ? "Quá khứ phân từ (V3)" : "Past Participle (V3)"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; }
+                            Text { horizontal-stretch: 1; text: root.ui-lang == "vi" ? "Nghĩa tiếng Việt" : "Meaning"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; }
+                            Text { width: 60px; text: root.ui-lang == "vi" ? "Thao tác" : "Action"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; horizontal-alignment: center; }
+                        }
+                    }
+
+                    // Table Body
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: white;
+                        border-color: #b0c8dc;
+                        border-width: 1px;
+                        ListView {
+                            for verb[idx] in root.irregular-verbs : Rectangle {
+                                height: 26px;
+                                background: vhit.has-hover ? #f0f7fd : (Math.mod(idx, 2) == 0 ? #fafcff : white);
+                                border-color: #eaf0f6;
+                                border-width: 1px;
+                                vhit := TouchArea {
+                                    clicked => {
+                                        root.query = verb.v1;
+                                        root.search(verb.v1);
+                                        root.active-tab = 0;
+                                    }
+                                }
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    spacing: 8px;
+                                    Text { width: 130px; text: verb.v1; font-weight: 700; color: #991b1b; font-size: 11px; vertical-alignment: center; }
+                                    Text { width: 130px; text: verb.v2; color: #1e40af; font-size: 11px; vertical-alignment: center; }
+                                    Text { width: 150px; text: verb.v3; color: #15803d; font-size: 11px; vertical-alignment: center; }
+                                    Text { horizontal-stretch: 1; text: verb.meaning; color: #334155; font-size: 11px; vertical-alignment: center; overflow: elide; }
+                                    Rectangle {
+                                        width: 60px;
+                                        ClassicButton {
+                                            text: root.ui-lang == "vi" ? "Tra từ" : "Lookup";
+                                            height: 20px;
+                                            clicked => {
+                                                root.query = verb.v1;
+                                                root.search(verb.v1);
+                                                root.active-tab = 0;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Sub-tab 1: Unit Converter
+                if root.appendix-sub-tab == 1 : VerticalLayout {
+                    spacing: 8px;
+                    Rectangle {
+                        height: 70px;
+                        background: #f4f9fd;
+                        border-color: #9eb7c9;
+                        border-width: 1px;
+                        border-radius: 2px;
+                        VerticalLayout {
+                            padding: 6px;
+                            spacing: 6px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Text { text: root.ui-lang == "vi" ? "Nhóm đơn vị:" : "Category:"; font-size: 11px; font-weight: 700; color: #15456f; vertical-alignment: center; }
+                                ClassicButton {
+                                    text: root.ui-lang == "vi" ? "Chiều dài" : "Length";
+                                    selected: root.unit-category == "length";
+                                    clicked => {
+                                        root.unit-category = "length";
+                                        root.unit-source = "m";
+                                        root.update-unit-conversions("length", "m", root.unit-input-val);
+                                    }
+                                }
+                                ClassicButton {
+                                    text: root.ui-lang == "vi" ? "Khối lượng" : "Weight";
+                                    selected: root.unit-category == "weight";
+                                    clicked => {
+                                        root.unit-category = "weight";
+                                        root.unit-source = "kg";
+                                        root.update-unit-conversions("weight", "kg", root.unit-input-val);
+                                    }
+                                }
+                                ClassicButton {
+                                    text: root.ui-lang == "vi" ? "Nhiệt độ" : "Temperature";
+                                    selected: root.unit-category == "temperature";
+                                    clicked => {
+                                        root.unit-category = "temperature";
+                                        root.unit-source = "C";
+                                        root.update-unit-conversions("temperature", "C", root.unit-input-val);
+                                    }
+                                }
+                                ClassicButton {
+                                    text: root.ui-lang == "vi" ? "Thể tích" : "Volume";
+                                    selected: root.unit-category == "volume";
+                                    clicked => {
+                                        root.unit-category = "volume";
+                                        root.unit-source = "L";
+                                        root.update-unit-conversions("volume", "L", root.unit-input-val);
+                                    }
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Text { text: root.ui-lang == "vi" ? "Giá trị nguồn:" : "Source Value:"; font-size: 11px; color: #15456f; vertical-alignment: center; }
+                                LineEdit {
+                                    text <=> root.unit-input-val;
+                                    placeholder-text: "100";
+                                    width: 150px;
+                                    edited => { root.update-unit-conversions(root.unit-category, root.unit-source, self.text); }
+                                }
+                                Text {
+                                    text: root.ui-lang == "vi" ? ("Đơn vị gốc: " + root.unit-source) : ("Base unit: " + root.unit-source);
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: #0369a1;
+                                    vertical-alignment: center;
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                        }
+                    }
+
+                    // Converted Results Table
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: white;
+                        border-color: #b0c8dc;
+                        border-width: 1px;
+                        VerticalLayout {
+                            spacing: 0px;
+                            Rectangle {
+                                height: 24px;
+                                background: #e2eef7;
+                                border-color: #b0c8dc;
+                                border-width: 1px;
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    spacing: 8px;
+                                    Text { width: 160px; text: root.ui-lang == "vi" ? "Tên đơn vị" : "Unit Name"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; }
+                                    Text { width: 80px; text: root.ui-lang == "vi" ? "Ký hiệu" : "Symbol"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; }
+                                    Text { horizontal-stretch: 1; text: root.ui-lang == "vi" ? "Giá trị quy đổi tương đương" : "Converted Equivalent Value"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; }
+                                    Text { width: 70px; text: root.ui-lang == "vi" ? "Sao chép" : "Copy"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; horizontal-alignment: center; }
+                                }
+                            }
+                            ListView {
+                                for row[idx] in root.unit-rows : Rectangle {
+                                    height: 28px;
+                                    background: Math.mod(idx, 2) == 0 ? #fafcff : white;
+                                    border-color: #edf2f7;
+                                    border-width: 1px;
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        spacing: 8px;
+                                        Text { width: 160px; text: row.name; font-weight: 600; color: #1e3a8a; font-size: 11px; vertical-alignment: center; }
+                                        Rectangle {
+                                            width: 80px;
+                                            Rectangle {
+                                                width: 50px;
+                                                height: 18px;
+                                                background: #e0f2fe;
+                                                border-color: #7dd3fc;
+                                                border-width: 1px;
+                                                border-radius: 3px;
+                                                y: (parent.height - self.height) / 2;
+                                                Text { text: row.symbol; color: #0369a1; font-weight: 700; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; }
+                                            }
+                                        }
+                                        Text { horizontal-stretch: 1; text: row.value-str; font-weight: 700; color: #0f172a; font-size: 12px; vertical-alignment: center; }
+                                        Rectangle {
+                                            width: 70px;
+                                            ClassicButton {
+                                                text: root.ui-lang == "vi" ? "Sao chép" : "Copy";
+                                                height: 20px;
+                                                clicked => { root.copy-to-clipboard(row.value-str); }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Sub-tab 2: IPA Chart
+                if root.appendix-sub-tab == 2 : VerticalLayout {
+                    spacing: 4px;
+                    Rectangle {
+                        height: 26px;
+                        background: #f0f7fd;
+                        border-color: #b0c8dc;
+                        border-width: 1px;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            Text {
+                                text: root.ui-lang == "vi" ? "Bảng 44 Ký hiệu Ngữ âm Quốc tế IPA (International Phonetic Alphabet) chuẩn Oxford / Cambridge" : "Oxford / Cambridge 44 International Phonetic Alphabet (IPA) Chart";
+                                font-size: 11px;
+                                font-weight: 700;
+                                color: #15456f;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: white;
+                        border-color: #b0c8dc;
+                        border-width: 1px;
+                        ListView {
+                            for item[idx] in root.ipa-symbols : Rectangle {
+                                height: 32px;
+                                background: ipahit.has-hover ? #f0f7fd : (Math.mod(idx, 2) == 0 ? #fafcff : white);
+                                border-color: #eaf0f6;
+                                border-width: 1px;
+                                ipahit := TouchArea {
+                                    clicked => { root.speak(item.sample-word, "en"); }
+                                }
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    spacing: 10px;
+                                    Rectangle {
+                                        width: 50px;
+                                        Rectangle {
+                                            width: 44px;
+                                            height: 24px;
+                                            background: #fef3c7;
+                                            border-color: #f59e0b;
+                                            border-width: 1px;
+                                            border-radius: 3px;
+                                            y: (parent.height - self.height) / 2;
+                                            Text {
+                                                text: item.symbol;
+                                                font-family: "Noto Sans";
+                                                font-weight: 700;
+                                                font-size: 14px;
+                                                color: #92400e;
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                    Text { width: 140px; text: item.category; color: #475569; font-size: 11px; vertical-alignment: center; }
+                                    Text { width: 80px; text: item.sample-word; font-weight: 700; color: #1e3a8a; font-size: 12px; vertical-alignment: center; }
+                                    Text { width: 100px; text: item.sample-ipa; color: #059669; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+                                    Text { horizontal-stretch: 1; text: item.description; color: #334155; font-size: 11px; vertical-alignment: center; overflow: elide; }
+                                    Rectangle {
+                                        width: 70px;
+                                        ClassicButton {
+                                            has-icon: true;
+                                            icon: @image-url("assets/act_speaker.png");
+                                            text: root.ui-lang == "vi" ? "Nghe" : "Listen";
+                                            height: 22px;
+                                            clicked => { root.speak(item.sample-word, "en"); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Sub-tab 3: Dialing Codes
+                if root.appendix-sub-tab == 3 : VerticalLayout {
+                    spacing: 4px;
+                    HorizontalLayout {
+                        height: 26px;
+                        spacing: 6px;
+                        Text {
+                            text: root.ui-lang == "vi" ? "Lọc quốc gia:" : "Filter country:";
+                            font-family: "Noto Sans";
+                            font-size: 11px;
+                            color: #174d7b;
+                            vertical-alignment: center;
+                        }
+                        LineEdit {
+                            text <=> root.dialing-query;
+                            placeholder-text: root.ui-lang == "vi" ? "Gõ tên quốc gia hoặc mã số (vd: Vietnam, Japan, +84, +1...)" : "Type country name or code (e.g. Vietnam, +84, +1...)";
+                            edited => { root.search-dialing-codes(self.text); }
+                            horizontal-stretch: 1;
+                        }
+                    }
+
+                    // Table Header
+                    Rectangle {
+                        height: 24px;
+                        background: #e2eef7;
+                        border-color: #b0c8dc;
+                        border-width: 1px;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 8px;
+                            Text { width: 80px; text: "ISO"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; }
+                            Text { horizontal-stretch: 1; text: root.ui-lang == "vi" ? "Quốc gia / Lãnh thổ" : "Country / Territory"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; }
+                            Text { width: 140px; text: root.ui-lang == "vi" ? "Mã vùng quốc tế" : "Dialing Code"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; }
+                            Text { width: 80px; text: root.ui-lang == "vi" ? "Sao chép" : "Copy"; font-weight: 700; color: #0a365c; font-size: 11px; vertical-alignment: center; horizontal-alignment: center; }
+                        }
+                    }
+
+                    // Table Body
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: white;
+                        border-color: #b0c8dc;
+                        border-width: 1px;
+                        ListView {
+                            for dc[idx] in root.dialing-codes : Rectangle {
+                                height: 26px;
+                                background: dchit.has-hover ? #f0f7fd : (Math.mod(idx, 2) == 0 ? #fafcff : white);
+                                border-color: #eaf0f6;
+                                border-width: 1px;
+                                dchit := TouchArea {
+                                    clicked => { root.copy-to-clipboard(dc.code); }
+                                }
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    spacing: 8px;
+                                    Rectangle {
+                                        width: 80px;
+                                        Rectangle {
+                                            width: 40px;
+                                            height: 18px;
+                                            background: #f1f5f9;
+                                            border-color: #cbd5e1;
+                                            border-width: 1px;
+                                            border-radius: 2px;
+                                            y: (parent.height - self.height) / 2;
+                                            Text { text: dc.flag; font-weight: 700; font-size: 10px; color: #475569; horizontal-alignment: center; vertical-alignment: center; }
+                                        }
+                                    }
+                                    Text { horizontal-stretch: 1; text: dc.country; font-weight: 600; color: #0f172a; font-size: 11px; vertical-alignment: center; }
+                                    Text { width: 140px; text: dc.code; font-weight: 700; color: #2563eb; font-size: 12px; vertical-alignment: center; }
+                                    Rectangle {
+                                        width: 80px;
+                                        ClassicButton {
+                                            text: root.ui-lang == "vi" ? "Sao chép" : "Copy";
+                                            height: 20px;
+                                            clicked => { root.copy-to-clipboard(dc.code); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // TAB 3: DICTIONARIES
+            if root.active-tab == 3 : VerticalLayout {
                 padding: 8px;
                 spacing: 6px;
                 SectionTitle { text: root.ui-lang == "vi" ? "Quản lý từ điển" : "Dictionary Management"; }
@@ -1282,8 +1887,8 @@ export component AppWindow inherits Window {
                 }
             }
 
-            // TAB 3: SETTINGS
-            if root.active-tab == 3 : ScrollView {
+                        // TAB 4: SETTINGS
+            if root.active-tab == 4 : ScrollView {
                 viewport-width: self.width;
                 VerticalLayout {
                     min-width: 0px;
@@ -1437,7 +2042,7 @@ export component AppWindow inherits Window {
                     horizontal-stretch: 1;
                 }
                 Text {
-                    text: root.private-mode ? (root.ui-lang == "vi" ? "[PRIVATE] Riêng tư" : "[PRIVATE]") : (root.ui-lang == "vi" ? "Sẵn sàng" : "Ready");
+                    text: root.private-mode ? (root.ui-lang == "vi" ? "[PRIVATE] Riêng tư" : "[PRIVATE]") : (root.ui-lang == "vi" ? "403.887 mục từ | UTF-8" : "403,887 entries | UTF-8");
                     color: #557591;
                     font-size: 10px;
                     vertical-alignment: center;
@@ -1481,7 +2086,13 @@ export component AppWindow inherits Window {
                 text: root.ui-lang == "vi" ? "Tra từ mới" : "New Search";
                 icon-text: "🔍";
                 shortcut: "Ctrl+N";
-                clicked => { root.query = ""; root.active-tab = 0; root.active-menu = 0; }
+                clicked => { root.query = ""; root.active-tab = 0; root.sidebar-mode = 0; root.active-menu = 0; }
+            }
+            MenuDropdownItem {
+                text: root.ui-lang == "vi" ? "Sổ tay từ vựng" : "Word Notebook";
+                icon-text: "⭐";
+                shortcut: "Ctrl+W";
+                clicked => { root.sidebar-mode = 2; root.active-tab = 0; root.active-menu = 0; }
             }
             MenuDropdownItem {
                 text: root.ui-lang == "vi" ? "Dịch văn bản" : "Text Translation";
@@ -1490,16 +2101,22 @@ export component AppWindow inherits Window {
                 clicked => { root.active-tab = 1; root.active-menu = 0; }
             }
             MenuDropdownItem {
+                text: root.ui-lang == "vi" ? "Phụ lục & Tiện ích" : "Appendices & Tools";
+                icon-text: "🧰";
+                shortcut: "Ctrl+A";
+                clicked => { root.active-tab = 2; root.active-menu = 0; }
+            }
+            MenuDropdownItem {
                 text: root.ui-lang == "vi" ? "Quản lý từ điển" : "Dictionaries";
                 icon-text: "📚";
                 shortcut: "Ctrl+D";
-                clicked => { root.active-tab = 2; root.active-menu = 0; }
+                clicked => { root.active-tab = 4; root.active-menu = 0; }
             }
             MenuDropdownItem {
                 text: root.ui-lang == "vi" ? "Cài đặt & Tùy biến" : "Preferences";
                 icon-text: "⚙";
                 shortcut: "Ctrl+P";
-                clicked => { root.active-tab = 3; root.active-menu = 0; }
+                clicked => { root.active-tab = 4; root.active-menu = 0; }
             }
             MenuDropdownItem { is-separator: true; }
             MenuDropdownItem {
@@ -1579,14 +2196,20 @@ export component AppWindow inherits Window {
             MenuDropdownItem {
                 text: root.ui-lang == "vi" ? "Danh sách Kết quả" : "Results List";
                 icon-text: "📑";
-                is-checked: !root.show-history-tab && root.active-tab == 0;
-                clicked => { root.show-history-tab = false; root.active-tab = 0; root.active-menu = 0; }
+                is-checked: root.sidebar-mode == 0 && root.active-tab == 0;
+                clicked => { root.sidebar-mode = 0; root.show-history-tab = false; root.active-tab = 0; root.active-menu = 0; }
             }
             MenuDropdownItem {
                 text: root.ui-lang == "vi" ? "Lịch sử tra cứu" : "Search History";
                 icon-text: "🕒";
-                is-checked: root.show-history-tab && root.active-tab == 0;
-                clicked => { root.show-history-tab = true; root.active-tab = 0; root.active-menu = 0; }
+                is-checked: root.sidebar-mode == 1 && root.active-tab == 0;
+                clicked => { root.sidebar-mode = 1; root.show-history-tab = true; root.active-tab = 0; root.active-menu = 0; }
+            }
+            MenuDropdownItem {
+                text: root.ui-lang == "vi" ? "Sổ tay từ vựng" : "Word Notebook";
+                icon-text: "⭐";
+                is-checked: root.sidebar-mode == 2 && root.active-tab == 0;
+                clicked => { root.sidebar-mode = 2; root.active-tab = 0; root.active-menu = 0; }
             }
             MenuDropdownItem { is-separator: true; }
             MenuDropdownItem {
@@ -1602,10 +2225,22 @@ export component AppWindow inherits Window {
                 clicked => { root.active-tab = 1; root.active-menu = 0; }
             }
             MenuDropdownItem {
-                text: root.ui-lang == "vi" ? "Trang Quản lý từ điển" : "Dictionaries Tab";
-                icon-text: "📚";
+                text: root.ui-lang == "vi" ? "Trang Phụ lục & Tiện ích" : "Appendices Tab";
+                icon-text: "🧰";
                 is-checked: root.active-tab == 2;
                 clicked => { root.active-tab = 2; root.active-menu = 0; }
+            }
+            MenuDropdownItem {
+                text: root.ui-lang == "vi" ? "Trang Quản lý từ điển" : "Dictionaries Tab";
+                icon-text: "📚";
+                is-checked: root.active-tab == 3;
+                clicked => { root.active-tab = 4; root.active-menu = 0; }
+            }
+            MenuDropdownItem {
+                text: root.ui-lang == "vi" ? "Trang Cài đặt & Cấu hình" : "Settings Tab";
+                icon-text: "⚙";
+                is-checked: root.active-tab == 4;
+                clicked => { root.active-tab = 4; root.active-menu = 0; }
             }
         }
     }
@@ -1662,7 +2297,7 @@ export component AppWindow inherits Window {
             MenuDropdownItem {
                 text: root.ui-lang == "vi" ? "Bảng Cài đặt chi tiết..." : "Detailed Settings...";
                 icon-text: "⚙";
-                clicked => { root.active-tab = 3; root.active-menu = 0; }
+                clicked => { root.active-tab = 4; root.active-menu = 0; }
             }
         }
     }

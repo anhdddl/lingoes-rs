@@ -6,17 +6,21 @@ A clean-room, Rust-only dictionary, translation, text capture, and text-to-speec
 
 ## Latest UI Gallery
 
-### Dictionary lookup and semantic definition view
+### Main dictionary window & Start Page
 
 ![Lingoes RS main dictionary window](docs/screenshots/lingoes-rs-main.png)
 
-### Interactive classic menu
+### Appendices & Reference Utilities (359 Irregular Verbs, Unit Converter, IPA, Dialing Codes)
 
-![Lingoes RS File menu](docs/screenshots/lingoes-rs-file-menu.png)
+![Lingoes RS Appendices](docs/screenshots/lingoes-rs-appendices.png)
 
-### Detailed bilingual dictionary result
+### Word Notebook (Favorites, Star tagging, HTML Export)
 
-![Lingoes RS dictionary detail](docs/screenshots/lingoes-rs-dictionary-detail.png)
+![Lingoes RS Word Notebook](docs/screenshots/lingoes-rs-notebook.png)
+
+### Detailed bilingual dictionary result with Action Bar
+
+![Lingoes RS dictionary detail](docs/screenshots/lingoes-rs-definition.png)
 
 ## Principles
 

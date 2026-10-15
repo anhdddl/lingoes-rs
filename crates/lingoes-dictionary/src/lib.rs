@@ -1314,6 +1314,23 @@ impl SqliteDictionary {
         Ok(())
     }
 
+    pub fn is_favorite(&self, headword: &str) -> Result<bool, DictionaryError> {
+        let count: i64 = self.connection.query_row(
+            "SELECT COUNT(1) FROM favorites WHERE headword = ?1 COLLATE NOCASE",
+            params![headword.trim()],
+            |r| r.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
+    pub fn remove_favorite_by_headword(&mut self, headword: &str) -> Result<bool, DictionaryError> {
+        let rows = self.connection.execute(
+            "DELETE FROM favorites WHERE headword = ?1 COLLATE NOCASE",
+            params![headword.trim()],
+        )?;
+        Ok(rows > 0)
+    }
+
     pub fn get_favorite(&self, id: i64) -> Result<Option<FavoriteEntry>, DictionaryError> {
         let mut statement = self.connection.prepare(
             "SELECT f.id, f.headword, f.dictionary_id, f.dictionary_name, f.snapshot_definition, f.folder, f.tags, f.notes, f.created_at, f.updated_at,

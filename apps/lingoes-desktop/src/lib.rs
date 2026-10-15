@@ -284,6 +284,109 @@ impl DesktopApp {
         Ok(())
     }
 
+    pub fn notebook_items(&self) -> Vec<String> {
+        self.dictionary
+            .list_favorites(None)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|f| f.headword)
+            .collect()
+    }
+
+    pub fn is_notebook_word(&self, headword: &str) -> bool {
+        self.dictionary.is_favorite(headword).unwrap_or(false)
+    }
+
+    pub fn toggle_notebook(&mut self, headword: &str, definition: &str) -> Result<bool, AppError> {
+        let is_fav = self.dictionary.is_favorite(headword).unwrap_or(false);
+        if is_fav {
+            self.dictionary
+                .remove_favorite_by_headword(headword)
+                .map_err(|e| AppError(e.to_string()))?;
+            self.status = if self.language() == "en" {
+                format!("Removed '{headword}' from notebook")
+            } else {
+                format!("Đã xóa '{headword}' khỏi sổ tay")
+            };
+            self.has_error = false;
+            Ok(false)
+        } else {
+            self.dictionary
+                .add_favorite(headword, None, definition, Some("Default"), &[], None)
+                .map_err(|e| AppError(e.to_string()))?;
+            self.status = if self.language() == "en" {
+                format!("Added '{headword}' to notebook")
+            } else {
+                format!("Đã thêm '{headword}' vào sổ tay")
+            };
+            self.has_error = false;
+            Ok(true)
+        }
+    }
+
+    pub fn remove_from_notebook(&mut self, headword: &str) -> Result<(), AppError> {
+        self.dictionary
+            .remove_favorite_by_headword(headword)
+            .map_err(|e| AppError(e.to_string()))?;
+        self.status = if self.language() == "en" {
+            format!("Removed '{headword}' from notebook")
+        } else {
+            format!("Đã xóa '{headword}' khỏi sổ tay")
+        };
+        self.has_error = false;
+        Ok(())
+    }
+
+    pub fn export_notebook_html(&mut self) -> Result<String, AppError> {
+        let favorites = self
+            .dictionary
+            .list_favorites(None)
+            .map_err(|e| AppError(e.to_string()))?;
+        if favorites.is_empty() {
+            self.status = if self.language() == "en" {
+                "Word notebook is empty".into()
+            } else {
+                "Sổ tay từ vựng đang trống".into()
+            };
+            self.has_error = false;
+            return Ok(String::new());
+        }
+
+        let mut html = String::from(
+            "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Lingoes RS - Sổ tay từ vựng</title><style>body{font-family:sans-serif;margin:30px;background:#f8fafc;}h1{color:#1e3a8a;border-bottom:2px solid #3b82f6;padding-bottom:10px;}.word-card{background:white;border:1px solid #cbd5e1;border-radius:6px;padding:15px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.05);}.headword{font-size:18px;font-weight:bold;color:#0f172a;}.def{margin-top:8px;color:#334155;line-height:1.5;white-space:pre-wrap;}</style></head><body>",
+        );
+        html.push_str("<h1>⭐ Sổ tay từ vựng - Lingoes RS</h1>");
+        html.push_str(&format!(
+            "<p>Tổng số: <b>{}</b> từ vựng đã lưu</p>",
+            favorites.len()
+        ));
+        for fav in favorites {
+            html.push_str("<div class='word-card'>");
+            html.push_str(&format!(
+                "<div class='headword'>{}</div>",
+                lingoes_core::escape_html(&fav.headword)
+            ));
+            html.push_str(&format!(
+                "<div class='def'>{}</div>",
+                lingoes_core::escape_html(&fav.snapshot_definition)
+            ));
+            html.push_str("</div>");
+        }
+        html.push_str("</body></html>");
+
+        let path = std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join("lingoes_vocabulary_notebook.html");
+        std::fs::write(&path, html).map_err(|e| AppError(e.to_string()))?;
+        self.status = if self.language() == "en" {
+            format!("Exported notebook to {}", path.display())
+        } else {
+            format!("Đã xuất sổ tay ra {}", path.display())
+        };
+        self.has_error = false;
+        Ok(path.to_string_lossy().to_string())
+    }
+
     pub fn select(&mut self, index: usize) {
         if index < self.results.len() {
             self.selected_index = Some(index);
@@ -701,6 +804,129 @@ pub fn launch_gui_with_options(
             None
         }
     };
+
+    // Initialize Appendices data in window
+    {
+        let verbs: Vec<IrregularVerbItem> = lingoes_core::list_irregular_verbs()
+            .iter()
+            .map(|v| IrregularVerbItem {
+                v1: SharedString::from(v.v1),
+                v2: SharedString::from(v.v2),
+                v3: SharedString::from(v.v3),
+                meaning: SharedString::from(v.meaning_vi),
+            })
+            .collect();
+        window.set_irregular_verbs(ModelRc::new(VecModel::from(verbs)));
+
+        let is_en = application.lock().unwrap().language() == "en";
+        let dialing: Vec<DialingCodeItem> = lingoes_core::DIALING_CODES
+            .iter()
+            .map(|d| DialingCodeItem {
+                country: SharedString::from(if is_en { d.country_en } else { d.country_vi }),
+                code: SharedString::from(d.code),
+                flag: SharedString::from(d.iso),
+            })
+            .collect();
+        window.set_dialing_codes(ModelRc::new(VecModel::from(dialing)));
+
+        let ipa: Vec<IpaItem> = lingoes_core::IPA_SYMBOLS
+            .iter()
+            .map(|s| IpaItem {
+                symbol: SharedString::from(s.symbol),
+                category: SharedString::from(s.category),
+                sample_word: SharedString::from(s.sample_word),
+                sample_ipa: SharedString::from(s.sample_ipa),
+                description: SharedString::from(s.description_vi),
+            })
+            .collect();
+        window.set_ipa_symbols(ModelRc::new(VecModel::from(ipa)));
+
+        let initial_units = compute_unit_rows("length", "m", "100");
+        window.set_unit_rows(ModelRc::new(VecModel::from(initial_units)));
+    }
+
+    // Word Notebook callbacks
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_toggle_notebook(move |headword, definition| {
+            let mut app = application.lock().unwrap();
+            let _ = app.toggle_notebook(headword.as_str(), definition.as_str());
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &app);
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_remove_notebook_item(move |headword| {
+            let mut app = application.lock().unwrap();
+            let _ = app.remove_from_notebook(headword.as_str());
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &app);
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_export_notebook(move || {
+            let mut app = application.lock().unwrap();
+            let _ = app.export_notebook_html();
+            if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &app);
+            }
+        });
+    }
+
+    // Appendices & Tools callbacks
+    {
+        let window_weak = window.as_weak();
+        window.on_search_irregular_verbs(move |query| {
+            let filtered: Vec<IrregularVerbItem> =
+                lingoes_core::search_irregular_verbs(query.as_str())
+                    .into_iter()
+                    .map(|v| IrregularVerbItem {
+                        v1: SharedString::from(v.v1),
+                        v2: SharedString::from(v.v2),
+                        v3: SharedString::from(v.v3),
+                        meaning: SharedString::from(v.meaning_vi),
+                    })
+                    .collect();
+            if let Some(window) = window_weak.upgrade() {
+                window.set_irregular_verbs(ModelRc::new(VecModel::from(filtered)));
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_search_dialing_codes(move |query| {
+            let app = application.lock().unwrap();
+            let is_en = app.language() == "en";
+            let filtered: Vec<DialingCodeItem> = lingoes_core::search_dialing_codes(query.as_str())
+                .into_iter()
+                .map(|d| DialingCodeItem {
+                    country: SharedString::from(if is_en { d.country_en } else { d.country_vi }),
+                    code: SharedString::from(d.code),
+                    flag: SharedString::from(d.iso),
+                })
+                .collect();
+            if let Some(window) = window_weak.upgrade() {
+                window.set_dialing_codes(ModelRc::new(VecModel::from(filtered)));
+            }
+        });
+    }
+    {
+        let window_weak = window.as_weak();
+        window.on_update_unit_conversions(move |category, from_unit, value_str| {
+            let rows = compute_unit_rows(category.as_str(), from_unit.as_str(), value_str.as_str());
+            if let Some(window) = window_weak.upgrade() {
+                window.set_unit_rows(ModelRc::new(VecModel::from(rows)));
+            }
+        });
+    }
 
     // Search callback
     {
@@ -1513,6 +1739,65 @@ fn show_windows_popup(window: &PopupWindow, application: &DesktopApp) -> Result<
         .map_err(|error| AppError(error.to_string()))
 }
 
+fn compute_unit_rows(category: &str, from_unit: &str, value_str: &str) -> Vec<UnitRow> {
+    let value = value_str.trim().parse::<f64>().unwrap_or(0.0);
+    let units: &[(&str, &str)] = match category {
+        "length" => &[
+            ("Mét", "m"),
+            ("Kilômét", "km"),
+            ("Xentimét", "cm"),
+            ("Milimét", "mm"),
+            ("Inch (in)", "inch"),
+            ("Foot (ft)", "foot"),
+            ("Yard (yd)", "yard"),
+            ("Dặm (Mile)", "mile"),
+        ],
+        "weight" => &[
+            ("Kilôgam", "kg"),
+            ("Gam", "g"),
+            ("Miligam", "mg"),
+            ("Pound (lb)", "lb"),
+            ("Ounce (oz)", "oz"),
+            ("Tấn", "ton"),
+        ],
+        "temperature" => &[
+            ("Độ Celsius (°C)", "C"),
+            ("Độ Fahrenheit (°F)", "F"),
+            ("Kelvin (K)", "K"),
+        ],
+        "volume" => &[
+            ("Lít (L)", "L"),
+            ("Mililít (mL)", "mL"),
+            ("Gallon (US)", "gal"),
+            ("Fluid Ounce (fl oz)", "fl_oz"),
+        ],
+        _ => &[],
+    };
+
+    units
+        .iter()
+        .map(|(name, sym)| {
+            let val_str = match lingoes_core::convert_units(category, value, from_unit, sym) {
+                Some(v) => {
+                    if v.abs() >= 100_000.0 || (v.abs() < 0.0001 && v != 0.0) {
+                        format!("{:.4e}", v)
+                    } else {
+                        let s = format!("{:.4}", v);
+                        let s = s.trim_end_matches('0');
+                        s.trim_end_matches('.').to_string()
+                    }
+                }
+                None => "—".to_string(),
+            };
+            UnitRow {
+                name: SharedString::from(*name),
+                symbol: SharedString::from(*sym),
+                value_str: SharedString::from(val_str),
+            }
+        })
+        .collect()
+}
+
 fn update_window(window: &AppWindow, application: &DesktopApp) {
     let rows: Vec<SearchResult> = application
         .results()
@@ -1587,6 +1872,15 @@ fn update_window(window: &AppWindow, application: &DesktopApp) {
     window.set_ocr_fallback_enabled(application.settings().capture.ocr_enabled);
     window.set_auto_pronounce_enabled(application.settings().popup.auto_pronounce);
     window.set_ui_lang(application.language().into());
+
+    let notebook_items: Vec<SharedString> = application
+        .notebook_items()
+        .into_iter()
+        .map(SharedString::from)
+        .collect();
+    window.set_notebook_items(ModelRc::new(VecModel::from(notebook_items)));
+    let is_fav = application.is_notebook_word(application.selected_headword());
+    window.set_is_current_favorite(is_fav);
 
     let history_items: Vec<SharedString> = application
         .history_items()
@@ -2345,5 +2639,49 @@ mod tests {
         let data_root = resolve_app_data_root(&exe).unwrap();
         let db_path = resolve_database_path(&data_root);
         assert!(db_path.ends_with("lexiforge.db") || db_path.ends_with("lingoes.db"));
+    }
+
+    #[test]
+    fn desktop_app_notebook_toggle_remove_and_export_html() {
+        let database_path = temporary_path("notebook-test", "db");
+        let mut app = DesktopApp::open(&database_path).unwrap();
+
+        assert!(!app.is_notebook_word("rust"));
+        assert!(app.notebook_items().is_empty());
+
+        // Toggle add
+        let added = app
+            .toggle_notebook("rust", "A systems programming language")
+            .unwrap();
+        assert!(added);
+        assert!(app.is_notebook_word("rust"));
+        let items = app.notebook_items();
+        assert_eq!(items, vec!["rust".to_string()]);
+
+        // Toggle remove
+        let removed = app.toggle_notebook("rust", "").unwrap();
+        assert!(!removed);
+        assert!(!app.is_notebook_word("rust"));
+        assert!(app.notebook_items().is_empty());
+
+        // Re-add and export HTML
+        app.toggle_notebook("slint", "A declarative GUI framework")
+            .unwrap();
+        app.toggle_notebook("rust", "Systems language").unwrap();
+        let export_path = app.export_notebook_html().unwrap();
+        assert!(export_path.ends_with(".html"));
+        let content = std::fs::read_to_string(&export_path).unwrap();
+        assert!(content.contains("<!DOCTYPE html>"));
+        assert!(content.contains("Sổ tay từ vựng"));
+        assert!(content.contains("slint"));
+        assert!(content.contains("rust"));
+        let _ = std::fs::remove_file(&export_path);
+
+        // Direct remove
+        app.remove_from_notebook("slint").unwrap();
+        assert!(!app.is_notebook_word("slint"));
+        assert_eq!(app.notebook_items(), vec!["rust".to_string()]);
+
+        let _ = std::fs::remove_file(database_path);
     }
 }

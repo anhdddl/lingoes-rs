@@ -1,8 +1,10 @@
 use unicode_normalization::UnicodeNormalization;
 
+pub mod appendices;
 pub mod document;
 pub mod metadata;
 
+pub use appendices::*;
 pub use document::{
     DefinitionSection, EntryBlock, FindMatch, FindResult, FormattedLine, LinkReference,
     PartOfSpeech, Phonetic, RichDocument, TextRange, escape_html, find_in_result,
