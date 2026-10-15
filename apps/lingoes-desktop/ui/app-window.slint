@@ -577,10 +577,9 @@ export component AppWindow inherits Window {
                     border-width: 1px;
                     border-radius: 2px;
                     HorizontalLayout {
-                        padding-left: 6px;
-                        padding-right: 6px;
+                        padding-left: 8px;
+                        padding-right: 8px;
                         spacing: 4px;
-                        alignment: center;
                         Text {
                             text: "Google";
                             color: #557591;
@@ -588,13 +587,17 @@ export component AppWindow inherits Window {
                             font-size: 11px;
                             font-italic: true;
                             vertical-alignment: center;
-                            horizontal-stretch: 1;
                         }
-                        Image {
-                            source: @image-url("assets/act_find.png");
-                            width: 13px;
-                            height: 13px;
-                            vertical-alignment: center;
+                        Rectangle { horizontal-stretch: 1; }
+                        Rectangle {
+                            width: 14px;
+                            Image {
+                                source: @image-url("assets/act_find.png");
+                                width: 14px;
+                                height: 14px;
+                                x: 0px;
+                                y: (parent.height - self.height) / 2;
+                            }
                         }
                     }
                     TouchArea { clicked => { root.web-search(root.query, "google"); } }
