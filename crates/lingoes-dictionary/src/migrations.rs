@@ -5,7 +5,7 @@ use rusqlite::{Connection, OptionalExtension};
 
 use crate::DictionaryError;
 
-pub const CURRENT_SCHEMA_VERSION: u32 = 4;
+pub const CURRENT_SCHEMA_VERSION: u32 = 5;
 
 pub fn schema_version(connection: &Connection) -> Result<u32, DictionaryError> {
     let migrations_table_exists: bool = connection
@@ -166,17 +166,19 @@ pub fn migrate_or_init(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 dictionary_id INTEGER NOT NULL REFERENCES dictionaries(id) ON DELETE CASCADE,
                 normalized_headword TEXT NOT NULL,
+                unaccented_headword TEXT,
                 headword TEXT NOT NULL,
                 definition TEXT NOT NULL,
                 UNIQUE(dictionary_id, normalized_headword)
             );
             CREATE INDEX IF NOT EXISTS entries_search_idx ON entries(normalized_headword, dictionary_id);
+            CREATE INDEX IF NOT EXISTS entries_unaccented_idx ON entries(unaccented_headword, dictionary_id);
             CREATE INDEX IF NOT EXISTS entries_dict_idx ON entries(dictionary_id);
 
             CREATE VIRTUAL TABLE entries_fts USING fts5(
                 headword,
                 definition,
-                tokenize = 'unicode61 remove_diacritics 0'
+                tokenize = 'unicode61 remove_diacritics 2'
             );
             CREATE TRIGGER entries_fts_insert AFTER INSERT ON entries BEGIN
                 INSERT INTO entries_fts(rowid, headword, definition)
@@ -245,10 +247,11 @@ pub fn migrate_or_init(
             VALUES (1, datetime('now'), 'Initial schema'),
                    (2, datetime('now'), 'Dictionaries, multi-dictionary entries, FTS5'),
                    (3, datetime('now'), 'Ordering, groups, history, favorites, online cache, import jobs'),
-                   (4, datetime('now'), 'Dictionary metadata columns');",
+                   (4, datetime('now'), 'Dictionary metadata columns'),
+                   (5, datetime('now'), 'Unaccented headword column and accent-insensitive FTS5');",
         )?;
         tx.commit()?;
-        return Ok(4);
+        return Ok(5);
     }
 
     if current < 2 {
@@ -427,6 +430,74 @@ pub fn migrate_or_init(
             "INSERT OR IGNORE INTO schema_migrations (version, applied_at, description)
              VALUES (4, datetime('now'), 'Dictionary metadata columns');",
             [],
+        )?;
+        tx.commit()?;
+        applied += 1;
+    }
+
+    if current < 5 {
+        let tx = connection.transaction()?;
+        let needs_unaccented = {
+            let mut stmt = tx.prepare("PRAGMA table_info(entries)")?;
+            let columns = stmt.query_map([], |r| r.get::<_, String>(1))?;
+            !columns
+                .filter_map(|c| c.ok())
+                .any(|c| c == "unaccented_headword")
+        };
+
+        if needs_unaccented {
+            tx.execute_batch(
+                "ALTER TABLE entries ADD COLUMN unaccented_headword TEXT;
+                 CREATE INDEX IF NOT EXISTS entries_unaccented_idx ON entries(unaccented_headword, dictionary_id);",
+            )?;
+        }
+
+        {
+            let mut select_stmt =
+                tx.prepare("SELECT id, headword FROM entries WHERE unaccented_headword IS NULL")?;
+            let rows =
+                select_stmt.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?;
+            let mut updates = Vec::new();
+            for item in rows {
+                let (id, headword) = item?;
+                let unacc = lingoes_core::strip_vietnamese_diacritics(&headword);
+                updates.push((id, unacc));
+            }
+            drop(select_stmt);
+
+            let mut update_stmt =
+                tx.prepare("UPDATE entries SET unaccented_headword = ?1 WHERE id = ?2")?;
+            for (id, unacc) in updates {
+                update_stmt.execute(rusqlite::params![unacc, id])?;
+            }
+        }
+
+        tx.execute_batch(
+            "DROP TRIGGER IF EXISTS entries_fts_insert;
+             DROP TRIGGER IF EXISTS entries_fts_delete;
+             DROP TRIGGER IF EXISTS entries_fts_update;
+             DROP TABLE IF EXISTS entries_fts;
+             CREATE VIRTUAL TABLE entries_fts USING fts5(
+                 headword,
+                 definition,
+                 tokenize = 'unicode61 remove_diacritics 2'
+             );
+             CREATE TRIGGER entries_fts_insert AFTER INSERT ON entries BEGIN
+                 INSERT INTO entries_fts(rowid, headword, definition)
+                 VALUES (new.id, new.headword, new.definition);
+             END;
+             CREATE TRIGGER entries_fts_delete AFTER DELETE ON entries BEGIN
+                 DELETE FROM entries_fts WHERE rowid = old.id;
+             END;
+             CREATE TRIGGER entries_fts_update AFTER UPDATE ON entries BEGIN
+                 DELETE FROM entries_fts WHERE rowid = old.id;
+                 INSERT INTO entries_fts(rowid, headword, definition)
+                 VALUES (new.id, new.headword, new.definition);
+             END;
+             INSERT INTO entries_fts(rowid, headword, definition)
+             SELECT id, headword, definition FROM entries;
+             INSERT OR IGNORE INTO schema_migrations (version, applied_at, description)
+             VALUES (5, datetime('now'), 'Unaccented headword column and accent-insensitive FTS5');",
         )?;
         tx.commit()?;
         applied += 1;

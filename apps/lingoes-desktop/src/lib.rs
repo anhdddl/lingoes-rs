@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use lingoes_capture::ClipboardWatcher;
 use lingoes_capture::SystemClipboardReader;
 use lingoes_core::{DictionaryEntry, LookupQuery};
-use lingoes_dictionary::{DictionaryMeta, SqliteDictionary};
+use lingoes_dictionary::{DictionaryMeta, HistoryKind, SqliteDictionary};
 use lingoes_platform::settings::{
     CaptureModeSetting, DataRoot, Settings, SettingsStore, resolve_data_root,
     system_installed_data_base,
@@ -197,8 +197,12 @@ impl DesktopApp {
     }
 
     pub fn search(&mut self, query: &str) {
-        self.last_live_query = query.trim().to_string();
-        self.search_with_mode(query, false);
+        let trimmed = query.trim();
+        self.last_live_query = trimmed.to_string();
+        let _ = self
+            .dictionary
+            .add_history_entry(HistoryKind::Search, trimmed, None, None, 100);
+        self.search_with_mode(trimmed, true);
     }
 
     /// Updates prefix results while typing and skips duplicate normalized input.
@@ -217,8 +221,8 @@ impl DesktopApp {
         self.search_with_mode(query, true);
     }
 
-    fn search_with_mode(&mut self, query: &str, full_text: bool) {
-        let Ok(query) = LookupQuery::new(query) else {
+    fn search_with_mode(&mut self, query: &str, advanced: bool) {
+        let Ok(lookup_query) = LookupQuery::new(query) else {
             self.results.clear();
             self.selected_index = None;
             self.status = if self.language() == "en" {
@@ -229,10 +233,10 @@ impl DesktopApp {
             self.has_error = false;
             return;
         };
-        let result = if full_text {
-            self.dictionary.lookup_full_text(&query, SEARCH_LIMIT)
+        let result = if advanced {
+            self.dictionary.lookup_advanced(&lookup_query, SEARCH_LIMIT)
         } else {
-            self.dictionary.lookup_prefix(&query, SEARCH_LIMIT)
+            self.dictionary.lookup_smart(&lookup_query, SEARCH_LIMIT)
         };
         match result {
             Ok(results) => {
@@ -242,12 +246,14 @@ impl DesktopApp {
                     match self.results.len() {
                         0 => "No matching words found".into(),
                         1 => "Found 1 result".into(),
+                        count if advanced => format!("Found {count} advanced results"),
                         count => format!("Found {count} results"),
                     }
                 } else {
                     match self.results.len() {
                         0 => "Không tìm thấy từ phù hợp".into(),
                         1 => "Tìm thấy 1 kết quả".into(),
+                        count if advanced => format!("Tìm thấy {count} kết quả nâng cao"),
                         count => format!("Tìm thấy {count} kết quả"),
                     }
                 };
@@ -255,6 +261,27 @@ impl DesktopApp {
             }
             Err(error) => self.set_error(error),
         }
+    }
+
+    pub fn history_items(&self) -> Vec<String> {
+        self.dictionary
+            .list_history(HistoryKind::Search, Some(50))
+            .unwrap_or_default()
+            .into_iter()
+            .map(|e| e.query)
+            .collect()
+    }
+
+    pub fn clear_history(&mut self) -> Result<(), AppError> {
+        self.dictionary
+            .clear_history(Some(HistoryKind::Search))
+            .map_err(|error| AppError(error.to_string()))?;
+        self.status = if self.language() == "en" {
+            "Search history cleared".into()
+        } else {
+            "Đã xóa lịch sử tra cứu".into()
+        };
+        Ok(())
     }
 
     pub fn select(&mut self, index: usize) {
@@ -1314,6 +1341,40 @@ pub fn launch_gui_with_options(
         });
     }
 
+    // Clear history callback
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_clear_history(move || {
+            let mut app = application.lock().unwrap();
+            let _ = app.clear_history();
+            if let Some(w) = window_weak.upgrade() {
+                update_window(&w, &app);
+            }
+        });
+    }
+
+    // Exit application callback
+    {
+        let window_weak = window.as_weak();
+        window.on_exit_app(move || {
+            if let Some(w) = window_weak.upgrade() {
+                let _ = w.hide();
+            }
+            std::process::exit(0);
+        });
+    }
+
+    // Open URL callback
+    {
+        window.on_open_url(move |url| {
+            if let Ok(parsed) = Url::parse(url.as_str()) {
+                let launcher = DefaultBrowserLauncher;
+                let _ = launcher.open_url(&parsed);
+            }
+        });
+    }
+
     if let Some(query) = initial_query {
         let mut app = application.lock().unwrap();
         app.search(query);
@@ -1526,6 +1587,13 @@ fn update_window(window: &AppWindow, application: &DesktopApp) {
     window.set_ocr_fallback_enabled(application.settings().capture.ocr_enabled);
     window.set_auto_pronounce_enabled(application.settings().popup.auto_pronounce);
     window.set_ui_lang(application.language().into());
+
+    let history_items: Vec<SharedString> = application
+        .history_items()
+        .into_iter()
+        .map(SharedString::from)
+        .collect();
+    window.set_history_items(ModelRc::new(VecModel::from(history_items)));
 
     window.set_status_text(application.status().into());
     window.set_status_is_error(application.has_error());
@@ -2082,6 +2150,46 @@ mod tests {
 
         app.dismiss_quick_popup();
         assert!(!app.show_quick_popup());
+
+        let _ = std::fs::remove_file(database_path);
+        let _ = std::fs::remove_file(source_path);
+    }
+
+    #[test]
+    fn desktop_app_search_vietnamese_diacritics_and_history() {
+        let database_path = temporary_path("vi-search-history", "db");
+        let source_path = temporary_path("vi-search-history", "tsv");
+        std::fs::write(
+            &source_path,
+            "chào\tLời chào hỏi\nchào cờ\tNghi thức chào cờ đầu tuần\nanh chàng keo kiệt\tNgười đàn ông bủn xỉn\n",
+        )
+        .unwrap();
+
+        let mut app = DesktopApp::open(&database_path).unwrap();
+        app.import_path(&source_path).unwrap();
+
+        // 1. Live search with unaccented single word
+        assert!(app.live_search("chao"));
+        assert!(!app.results().is_empty());
+        assert_eq!(app.results()[0].headword(), "chào");
+
+        // 2. Live search with unaccented multi-word (2 words)
+        assert!(app.live_search("chao co"));
+        assert!(!app.results().is_empty());
+        assert_eq!(app.results()[0].headword(), "chào cờ");
+
+        // 3. Search with 4 words (unaccented)
+        app.search("anh chang keo kiet");
+        assert!(!app.results().is_empty());
+        assert_eq!(app.results()[0].headword(), "anh chàng keo kiệt");
+
+        // 4. Verify search history was recorded
+        let history = app.history_items();
+        assert!(history.contains(&"anh chang keo kiet".to_string()));
+
+        // 5. Clear history
+        app.clear_history().unwrap();
+        assert!(app.history_items().is_empty());
 
         let _ = std::fs::remove_file(database_path);
         let _ = std::fs::remove_file(source_path);

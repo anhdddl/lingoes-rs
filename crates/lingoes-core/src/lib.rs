@@ -15,6 +15,7 @@ pub use metadata::DictionaryMetadata;
 pub struct DictionaryEntry {
     headword: String,
     normalized_headword: String,
+    unaccented_headword: String,
     definition: String,
     dictionary_id: Option<i64>,
     dictionary_name: Option<String>,
@@ -36,9 +37,12 @@ impl DictionaryEntry {
         if definition.is_empty() {
             return Err(EntryError::EmptyDefinition);
         }
+        let normalized_headword = normalize_search_text(headword);
+        let unaccented_headword = strip_vietnamese_diacritics(headword);
         Ok(Self {
             headword: headword.to_owned(),
-            normalized_headword: normalize_search_text(headword),
+            normalized_headword,
+            unaccented_headword,
             definition: definition.to_owned(),
             dictionary_id: None,
             dictionary_name: None,
@@ -70,6 +74,10 @@ impl DictionaryEntry {
         &self.normalized_headword
     }
 
+    pub fn unaccented_headword(&self) -> &str {
+        &self.unaccented_headword
+    }
+
     pub fn definition(&self) -> &str {
         &self.definition
     }
@@ -84,7 +92,10 @@ impl DictionaryEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LookupQuery(String);
+pub struct LookupQuery {
+    normalized: String,
+    unaccented: String,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueryError {
@@ -95,17 +106,41 @@ pub fn normalize_search_text(value: &str) -> String {
     value.nfc().flat_map(char::to_lowercase).nfc().collect()
 }
 
+pub fn strip_vietnamese_diacritics(value: &str) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    let mapped: String = value
+        .chars()
+        .map(|c| match c {
+            'đ' | 'Đ' => 'd',
+            other => other,
+        })
+        .collect();
+    mapped
+        .nfd()
+        .filter(|c| !('\u{0300}'..='\u{036f}').contains(c))
+        .flat_map(char::to_lowercase)
+        .nfc()
+        .collect()
+}
+
 impl LookupQuery {
     pub fn new(query: impl AsRef<str>) -> Result<Self, QueryError> {
         let query = query.as_ref().trim();
         if query.is_empty() {
             return Err(QueryError::Empty);
         }
-        Ok(Self(normalize_search_text(query)))
+        Ok(Self {
+            normalized: normalize_search_text(query),
+            unaccented: strip_vietnamese_diacritics(query),
+        })
     }
 
     pub fn as_str(&self) -> &str {
-        &self.0
+        &self.normalized
+    }
+
+    pub fn unaccented(&self) -> &str {
+        &self.unaccented
     }
 }
 
@@ -153,8 +188,28 @@ mod tests {
 
     #[test]
     fn normalization_handles_unicode_case_expansion() {
-        let entry = DictionaryEntry::new("İstanbul", "city").unwrap();
+        let entry = DictionaryEntry::new("İSTANBUL", "city").unwrap();
         assert_eq!(entry.normalized_headword(), "i\u{307}stanbul");
+    }
+
+    #[test]
+    fn strip_vietnamese_diacritics_handles_single_and_multi_word_phrases() {
+        assert_eq!(strip_vietnamese_diacritics("chào"), "chao");
+        assert_eq!(strip_vietnamese_diacritics("chào cờ"), "chao co");
+        assert_eq!(strip_vietnamese_diacritics("cảm ơn"), "cam on");
+        assert_eq!(strip_vietnamese_diacritics("tạm biệt"), "tam biet");
+        assert_eq!(strip_vietnamese_diacritics("đường phố"), "duong pho");
+        assert_eq!(
+            strip_vietnamese_diacritics("anh chàng keo kiệt"),
+            "anh chang keo kiet"
+        );
+        assert_eq!(
+            strip_vietnamese_diacritics("Cộng Hòa Xã Hội Chủ Nghĩa Việt Nam"),
+            "cong hoa xa hoi chu nghia viet nam"
+        );
+        let query = LookupQuery::new("Chào Cờ").unwrap();
+        assert_eq!(query.as_str(), "chào cờ");
+        assert_eq!(query.unaccented(), "chao co");
     }
 
     #[test]

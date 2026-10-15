@@ -193,3 +193,60 @@ fn backup_and_restore_database() {
         1
     );
 }
+
+#[test]
+fn test_unaccented_and_multiword_vietnamese_lookup() {
+    let mut dict = SqliteDictionary::in_memory().expect("in-memory db");
+    dict.upsert(&DictionaryEntry::new("chào", "to greet, salute").unwrap())
+        .unwrap();
+    dict.upsert(&DictionaryEntry::new("chào cờ", "to salute the flag").unwrap())
+        .unwrap();
+    dict.upsert(&DictionaryEntry::new("chào buổi sáng", "good morning").unwrap())
+        .unwrap();
+    dict.upsert(&DictionaryEntry::new("anh chàng keo kiệt", "miserly person").unwrap())
+        .unwrap();
+    dict.upsert(&DictionaryEntry::new("keo kiệt", "stingy").unwrap())
+        .unwrap();
+    dict.upsert(
+        &DictionaryEntry::new(
+            "cộng hòa xã hội chủ nghĩa việt nam",
+            "socialist republic of vietnam",
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    // 1. Single word unaccented prefix
+    let q = LookupQuery::new("chao").unwrap();
+    let res = dict.lookup_prefix(&q, 10).unwrap();
+    let words: Vec<&str> = res.iter().map(|e| e.headword()).collect();
+    assert!(words.contains(&"chào"));
+    assert!(words.contains(&"chào cờ"));
+    assert!(words.contains(&"chào buổi sáng"));
+
+    // 2. Multi-word unaccented prefix (2 words)
+    let q = LookupQuery::new("chao co").unwrap();
+    let res = dict.lookup_prefix(&q, 10).unwrap();
+    let words: Vec<&str> = res.iter().map(|e| e.headword()).collect();
+    assert_eq!(words, vec!["chào cờ"]);
+
+    // 3. Multi-word phrase anywhere in headword (e.g. 'keo kiet' inside 'anh chàng keo kiệt')
+    let q = LookupQuery::new("keo kiet").unwrap();
+    let res = dict.lookup_smart(&q, 10).unwrap();
+    let words: Vec<&str> = res.iter().map(|e| e.headword()).collect();
+    assert!(words.contains(&"keo kiệt"));
+    assert!(words.contains(&"anh chàng keo kiệt"));
+
+    // 4. 4 words unaccented
+    let q = LookupQuery::new("cong hoa xa hoi").unwrap();
+    let res = dict.lookup_smart(&q, 10).unwrap();
+    let words: Vec<&str> = res.iter().map(|e| e.headword()).collect();
+    assert!(words.contains(&"cộng hòa xã hội chủ nghĩa việt nam"));
+
+    // 5. Advanced search finding keywords in definition
+    let q = LookupQuery::new("salute").unwrap();
+    let res = dict.lookup_advanced(&q, 10).unwrap();
+    let words: Vec<&str> = res.iter().map(|e| e.headword()).collect();
+    assert!(words.contains(&"chào"));
+    assert!(words.contains(&"chào cờ"));
+}

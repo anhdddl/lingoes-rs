@@ -885,10 +885,11 @@ impl SqliteDictionary {
             "SELECT e.headword, e.definition, e.dictionary_id, d.name
              FROM entries e
              JOIN dictionaries d ON d.id = e.dictionary_id
-             WHERE e.normalized_headword = ?1 AND d.enabled = 1 AND {group_col} = 1
-             ORDER BY d.sort_order ASC, d.id ASC, e.headword ASC"
+             WHERE (e.normalized_headword = ?1 OR e.unaccented_headword = ?2) AND d.enabled = 1 AND {group_col} = 1
+             ORDER BY CASE WHEN e.normalized_headword = ?1 THEN 0 ELSE 1 END,
+                      d.sort_order ASC, d.id ASC, e.headword ASC"
         );
-        self.query_entries(&sql, params![query.as_str()])
+        self.query_entries(&sql, params![query.as_str(), query.unaccented()])
     }
 
     pub fn lookup_prefix(
@@ -913,19 +914,162 @@ impl SqliteDictionary {
             DictionaryGroup::Index => "d.in_index_group",
             DictionaryGroup::Capture => "d.in_capture_group",
         };
-        let upper_bound = format!("{}{}", query.as_str(), char::MAX);
+        let norm_upper = format!("{}{}", query.as_str(), char::MAX);
+        let unacc_upper = format!("{}{}", query.unaccented(), char::MAX);
         let sql = format!(
             "SELECT e.headword, e.definition, e.dictionary_id, d.name
              FROM entries e
              JOIN dictionaries d ON d.id = e.dictionary_id
-             WHERE e.normalized_headword >= ?1 AND e.normalized_headword < ?2 AND d.enabled = 1 AND {group_col} = 1
-             ORDER BY CASE WHEN e.normalized_headword = ?1 THEN 0 ELSE 1 END,
+             WHERE ((e.normalized_headword >= ?1 AND e.normalized_headword < ?2)
+                 OR (e.unaccented_headword >= ?3 AND e.unaccented_headword < ?4))
+               AND d.enabled = 1 AND {group_col} = 1
+             ORDER BY CASE 
+                        WHEN e.normalized_headword = ?1 THEN 0 
+                        WHEN e.unaccented_headword = ?3 THEN 1 
+                        WHEN e.normalized_headword >= ?1 AND e.normalized_headword < ?2 THEN 2
+                        ELSE 3 
+                      END,
                       d.sort_order ASC,
                       e.normalized_headword ASC,
                       d.id ASC
-             LIMIT ?3"
+             LIMIT ?5"
         );
-        self.query_entries(&sql, params![query.as_str(), upper_bound, limit])
+        self.query_entries(
+            &sql,
+            params![
+                query.as_str(),
+                norm_upper,
+                query.unaccented(),
+                unacc_upper,
+                limit
+            ],
+        )
+    }
+
+    pub fn lookup_smart(
+        &self,
+        query: &LookupQuery,
+        limit: usize,
+    ) -> Result<Vec<DictionaryEntry>, DictionaryError> {
+        self.lookup_smart_in_group(query, limit, DictionaryGroup::Query)
+    }
+
+    pub fn lookup_smart_in_group(
+        &self,
+        query: &LookupQuery,
+        limit: usize,
+        group: DictionaryGroup,
+    ) -> Result<Vec<DictionaryEntry>, DictionaryError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let mut results = self.lookup_prefix_in_group(query, limit, group)?;
+
+        let raw_query = query.as_str().trim();
+        let words: Vec<&str> = raw_query.split_whitespace().collect();
+
+        // If we already have full results and it's a single word, return directly
+        if results.len() >= limit && words.len() <= 1 {
+            return Ok(results);
+        }
+
+        // For multi-word queries or sparse prefix results, supplement with FTS phrase search
+        let mut seen: std::collections::HashSet<(Option<i64>, String)> = results
+            .iter()
+            .map(|e| (e.dictionary_id(), e.headword().to_string()))
+            .collect();
+
+        let clean = raw_query.replace(['"', '*'], "").trim().to_string();
+        if !clean.is_empty() {
+            let fts_query = format!("headword: \"{clean}\"*");
+            let remaining = limit.saturating_sub(results.len()).max(10);
+            if let Ok(fts_matches) = self.query_fts_headword_in_group(&fts_query, remaining, group)
+            {
+                for entry in fts_matches {
+                    let key = (entry.dictionary_id(), entry.headword().to_string());
+                    if !seen.contains(&key) {
+                        seen.insert(key);
+                        results.push(entry);
+                        if results.len() >= limit {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(results)
+    }
+
+    pub fn lookup_advanced(
+        &self,
+        query: &LookupQuery,
+        limit: usize,
+    ) -> Result<Vec<DictionaryEntry>, DictionaryError> {
+        self.lookup_advanced_in_group(query, limit, DictionaryGroup::Query)
+    }
+
+    pub fn lookup_advanced_in_group(
+        &self,
+        query: &LookupQuery,
+        limit: usize,
+        group: DictionaryGroup,
+    ) -> Result<Vec<DictionaryEntry>, DictionaryError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let mut results = self.lookup_smart_in_group(query, limit, group)?;
+        if results.len() < limit {
+            let mut seen: std::collections::HashSet<(Option<i64>, String)> = results
+                .iter()
+                .map(|e| (e.dictionary_id(), e.headword().to_string()))
+                .collect();
+            let remaining = limit - results.len();
+            if let Ok(full_text_results) = self.lookup_full_text_in_group(query, remaining, group) {
+                for entry in full_text_results {
+                    let key = (entry.dictionary_id(), entry.headword().to_string());
+                    if !seen.contains(&key) {
+                        seen.insert(key);
+                        results.push(entry);
+                    }
+                }
+            }
+        }
+        Ok(results)
+    }
+
+    fn query_fts_headword_in_group(
+        &self,
+        fts_query: &str,
+        limit: usize,
+        group: DictionaryGroup,
+    ) -> Result<Vec<DictionaryEntry>, DictionaryError> {
+        let group_col = match group {
+            DictionaryGroup::Query => "d.in_query_group",
+            DictionaryGroup::Index => "d.in_index_group",
+            DictionaryGroup::Capture => "d.in_capture_group",
+        };
+        let sql = format!(
+            "SELECT e.headword, e.definition, e.dictionary_id, d.name
+             FROM entries_fts f
+             JOIN entries e ON e.id = f.rowid
+             JOIN dictionaries d ON d.id = e.dictionary_id
+             WHERE entries_fts MATCH ?1 AND d.enabled = 1 AND {group_col} = 1
+             ORDER BY d.sort_order ASC, bm25(entries_fts), e.normalized_headword ASC, d.id ASC
+             LIMIT ?2"
+        );
+        match self.query_entries(&sql, params![fts_query, limit]) {
+            Ok(entries) => Ok(entries),
+            Err(DictionaryError::Database(err)) => {
+                let msg = err.to_string();
+                if msg.contains("syntax error") || msg.contains("fts5") {
+                    Ok(Vec::new())
+                } else {
+                    Err(DictionaryError::Database(err))
+                }
+            }
+            Err(other) => Err(other),
+        }
     }
 
     pub fn lookup_full_text(
@@ -1384,14 +1528,16 @@ fn upsert_entry_connection(
     entry: &DictionaryEntry,
 ) -> rusqlite::Result<usize> {
     connection.execute(
-        "INSERT INTO entries (dictionary_id, normalized_headword, headword, definition)
-         VALUES (?1, ?2, ?3, ?4)
+        "INSERT INTO entries (dictionary_id, normalized_headword, unaccented_headword, headword, definition)
+         VALUES (?1, ?2, ?3, ?4, ?5)
          ON CONFLICT(dictionary_id, normalized_headword) DO UPDATE SET
+            unaccented_headword = excluded.unaccented_headword,
             headword = excluded.headword,
             definition = excluded.definition",
         params![
             dictionary_id,
             entry.normalized_headword(),
+            entry.unaccented_headword(),
             entry.headword(),
             entry.definition()
         ],

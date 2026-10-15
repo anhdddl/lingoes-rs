@@ -202,7 +202,7 @@ fn migration_from_v3_to_v4_adds_metadata_columns() {
         dict.schema_version().expect("version"),
         CURRENT_SCHEMA_VERSION
     );
-    assert_eq!(CURRENT_SCHEMA_VERSION, 4);
+    assert_eq!(CURRENT_SCHEMA_VERSION, 5);
 
     let meta = dict
         .get_dictionary_metadata(1)

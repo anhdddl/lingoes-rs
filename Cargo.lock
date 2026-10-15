@@ -2350,7 +2350,7 @@ dependencies = [
 
 [[package]]
 name = "lingoes-capture"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "arboard",
  "crossbeam-channel",
@@ -2369,7 +2369,7 @@ dependencies = [
 
 [[package]]
 name = "lingoes-desktop"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "arboard",
  "lingoes-capture",
@@ -2389,7 +2389,7 @@ dependencies = [
 
 [[package]]
 name = "lingoes-dictionary"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "adler2",
  "flate2",
@@ -2405,7 +2405,7 @@ dependencies = [
 
 [[package]]
 name = "lingoes-platform"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "fs2",
  "serde",
@@ -2419,7 +2419,7 @@ dependencies = [
 
 [[package]]
 name = "lingoes-translator"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "lingoes-core",
  "reqwest",
@@ -2432,7 +2432,7 @@ dependencies = [
 
 [[package]]
 name = "lingoes-tts"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "lingoes-core",
  "thiserror 2.0.21",
@@ -5667,7 +5667,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
