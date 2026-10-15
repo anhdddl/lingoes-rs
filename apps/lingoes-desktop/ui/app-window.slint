@@ -346,16 +346,12 @@ export component AppWindow inherits Window {
                 padding-left: 8px;
                 padding-right: 8px;
                 spacing: 8px;
-                // Multi-color parrot emblem
-                Rectangle {
+                // Parrot emblem
+                Image {
+                    source: @image-url("assets/lingoes_icon.png");
                     width: 18px;
                     height: 18px;
                     y: 3px;
-                    border-radius: 9px;
-                    background: #4caf50;
-                    Rectangle { x: 2px; y: 2px; width: 8px; height: 8px; border-radius: 4px; background: #ffeb3b; }
-                    Rectangle { x: 9px; y: 3px; width: 7px; height: 6px; background: #f44336; }
-                    Rectangle { x: 3px; y: 9px; width: 6px; height: 6px; background: #2196f3; }
                 }
                 Text {
                     text: "LINGOES";
@@ -640,30 +636,36 @@ export component AppWindow inherits Window {
                                 padding-top: 6px;
                                 spacing: 4px;
                                 ClassicButton {
-                                    text: "R";
+                                    text: "📖";
                                     width: 26px;
                                     height: 24px;
                                     selected: !root.show-history-tab;
                                     clicked => { root.show-history-tab = false; }
                                 }
                                 ClassicButton {
-                                    text: "H";
+                                    text: "🕒";
                                     width: 26px;
                                     height: 24px;
                                     selected: root.show-history-tab;
                                     clicked => { root.show-history-tab = true; }
                                 }
                                 ClassicButton {
-                                    text: "T";
+                                    text: "🌐";
                                     width: 26px;
                                     height: 24px;
                                     clicked => { root.active-tab = 1; }
                                 }
                                 ClassicButton {
-                                    text: "D";
+                                    text: "📚";
                                     width: 26px;
                                     height: 24px;
                                     clicked => { root.active-tab = 2; }
+                                }
+                                ClassicButton {
+                                    text: "⚙";
+                                    width: 26px;
+                                    height: 24px;
+                                    clicked => { root.active-tab = 3; }
                                 }
                             }
                         }
@@ -813,31 +815,31 @@ export component AppWindow inherits Window {
                                     horizontal-stretch: 1;
                                 }
                                 ClassicButton {
-                                    text: root.ui-lang == "vi" ? "Phát âm" : "Speak";
-                                    width: root.ui-lang == "vi" ? 58px : 50px;
+                                    text: root.ui-lang == "vi" ? "🔊 Phát âm" : "🔊 Speak";
+                                    width: root.ui-lang == "vi" ? 76px : 68px;
                                     enabled: root.selected-headword != "";
                                     clicked => { root.speak(root.selected-headword, "en"); }
                                 }
                                 ClassicButton {
-                                    text: root.ui-lang == "vi" ? "Dừng" : "Stop";
-                                    width: 42px;
+                                    text: root.ui-lang == "vi" ? "⏹ Dừng" : "⏹ Stop";
+                                    width: root.ui-lang == "vi" ? 58px : 52px;
                                     clicked => { root.stop-tts(); }
                                 }
                                 ClassicButton {
-                                    text: root.ui-lang == "vi" ? "Sao chép" : "Copy";
-                                    width: root.ui-lang == "vi" ? 62px : 48px;
+                                    text: root.ui-lang == "vi" ? "📋 Sao chép" : "📋 Copy";
+                                    width: root.ui-lang == "vi" ? 78px : 60px;
                                     enabled: root.selected-headword != "";
                                     clicked => { root.copy-to-clipboard(root.selected-headword + "\\n" + root.selected-definition); }
                                 }
                                 ClassicButton {
-                                    text: root.ui-lang == "vi" ? "Lưu" : "Save";
-                                    width: 40px;
+                                    text: root.ui-lang == "vi" ? "💾 Lưu" : "💾 Save";
+                                    width: 52px;
                                     enabled: root.selected-headword != "";
                                     clicked => { root.export-result-html(); }
                                 }
                                 ClassicButton {
-                                    text: root.ui-lang == "vi" ? "FTS" : "Find";
-                                    width: 40px;
+                                    text: root.ui-lang == "vi" ? "🔍 FTS" : "🔍 Find";
+                                    width: 52px;
                                     clicked => { root.full-text-search(root.query); }
                                 }
                             }
