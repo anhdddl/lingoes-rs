@@ -1059,6 +1059,65 @@ fn classify_display_line(line: &str) -> Vec<FormattedLine> {
     if trimmed.is_empty() {
         return Vec::new();
     }
+    let segments = split_stardict_segments(trimmed);
+    segments
+        .into_iter()
+        .flat_map(classify_display_segment)
+        .collect()
+}
+
+fn split_stardict_segments(line: &str) -> Vec<&str> {
+    let trimmed = line.trim();
+    let has_markers = trimmed.starts_with("* ")
+        || trimmed.starts_with("- ")
+        || trimmed.starts_with("– ")
+        || trimmed.starts_with("= ")
+        || trimmed.starts_with('=')
+        || line.contains(" * ")
+        || line.contains(" - ")
+        || line.contains(" – ")
+        || line.contains(" = ")
+        || line.contains(" =");
+    if !has_markers {
+        return vec![trimmed];
+    }
+
+    let mut indices = Vec::new();
+    let mut prev_whitespace = true;
+    for (i, c) in line.char_indices() {
+        if prev_whitespace {
+            let rest = &line[i..];
+            if rest.starts_with("* ")
+                || rest.starts_with("- ")
+                || rest.starts_with("– ")
+                || rest.starts_with("= ")
+                || rest.starts_with('=')
+            {
+                indices.push(i);
+            }
+        }
+        prev_whitespace = c.is_whitespace();
+    }
+
+    if indices.is_empty() {
+        return vec![trimmed];
+    }
+    if indices[0] != 0 {
+        indices.insert(0, 0);
+    }
+    indices.push(line.len());
+
+    let mut segments = Vec::new();
+    for window in indices.windows(2) {
+        let seg = line[window[0]..window[1]].trim();
+        if !seg.is_empty() {
+            segments.push(seg);
+        }
+    }
+    segments
+}
+
+fn classify_display_segment(trimmed: &str) -> Vec<FormattedLine> {
     if let Some(pos) = trimmed.find(" — /") {
         let (head, rest) = trimmed.split_at(pos);
         let phonetic = rest.trim_start_matches(" — ").trim();
@@ -1069,6 +1128,10 @@ fn classify_display_line(line: &str) -> Vec<FormattedLine> {
     }
     if trimmed.starts_with('/') && trimmed.ends_with('/') {
         return vec![FormattedLine::new("phonetic", "", trimmed)];
+    }
+    if let Some(body) = trimmed.strip_prefix('*') {
+        let body = body.trim();
+        return vec![FormattedLine::new("pos", "■", body)];
     }
     if let Some(body) = trimmed.strip_prefix('■') {
         let body = body.trim();
@@ -1081,10 +1144,20 @@ fn classify_display_line(line: &str) -> Vec<FormattedLine> {
         return vec![FormattedLine::new(kind, "■", body)];
     }
     if let Some(body) = trimmed
-        .strip_prefix('▸')
+        .strip_prefix('=')
+        .or_else(|| trimmed.strip_prefix('▸'))
         .or_else(|| trimmed.strip_prefix('‣'))
     {
-        return vec![FormattedLine::new("example", "▸", body.trim())];
+        let body = body.trim();
+        let formatted = if let Some((ex, tr)) = body.split_once('+') {
+            format!("{} ↔ {}", ex.trim(), tr.trim())
+        } else {
+            body.to_string()
+        };
+        return vec![FormattedLine::new("example", "▸", formatted)];
+    }
+    if let Some(body) = trimmed.strip_prefix('-').or_else(|| trimmed.strip_prefix('–')) {
+        return vec![FormattedLine::new("sense", "•", body.trim())];
     }
     if let Some(body) = trimmed.strip_prefix('•') {
         return vec![FormattedLine::new("bullet", "•", body.trim())];
@@ -1115,10 +1188,24 @@ fn is_part_of_speech(text: &str) -> bool {
         "conjunction",
         "interjection",
         "article",
+        "excl",
+        "dtừ",
+        "đtừ",
+        "ttừ",
+        "nđtừ",
+        "thán từ",
+        "thngữ",
+        "adj",
+        "adv",
+        "prep",
+        "conj",
+        "interj",
+        "v",
+        "n",
     ];
     TOKENS
         .iter()
-        .any(|token| text == *token || text.starts_with(&format!("{token} ")))
+        .any(|token| text == *token || text.starts_with(&format!("{token} ")) || text.starts_with(&format!("{token}.")))
 }
 
 fn try_split_numbered_sense(text: &str) -> Option<(String, String)> {

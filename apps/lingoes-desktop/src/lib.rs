@@ -627,7 +627,13 @@ pub fn launch_gui_with_options(
     let window = AppWindow::new().map_err(|error| AppError(error.to_string()))?;
     let popup_window = PopupWindow::new().map_err(|error| AppError(error.to_string()))?;
     #[cfg(windows)]
-    let _popup_native = materialize_windows_popup(&popup_window)?;
+    let _popup_native = match materialize_windows_popup(&popup_window) {
+        Ok(native) => Some(native),
+        Err(error) => {
+            eprintln!("Warning: could not materialize Windows popup adapter: {error}");
+            None
+        }
+    };
 
     // Search callback
     {
@@ -1703,6 +1709,33 @@ pub fn run_with_services(
             "unknown command or invalid arguments: {command}\n{USAGE}"
         ))),
     }
+}
+
+pub fn show_fatal_error(title: &str, message: &str) {
+    eprintln!("{title}: {message}");
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let log_file = dir.join("lingoes_crash.log");
+            let _ = std::fs::write(&log_file, format!("{title}\n\n{message}\n"));
+        }
+    }
+    #[cfg(windows)]
+    {
+        use windows::core::HSTRING;
+        use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
+        let title_h = HSTRING::from(title);
+        let message_h = HSTRING::from(message);
+        unsafe {
+            let _ = MessageBoxW(None, &message_h, &title_h, MB_OK | MB_ICONERROR);
+        }
+    }
+}
+
+pub fn setup_panic_hook() {
+    std::panic::set_hook(Box::new(|info| {
+        let msg = format!("Application panic:\n{info}");
+        show_fatal_error("Lingoes RS - Fatal Error", &msg);
+    }));
 }
 
 #[cfg(test)]

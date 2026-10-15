@@ -17,6 +17,7 @@ slint = { version = "=1.8.0", default-features = false, features = [
     "backend-winit",
     "compat-1-2",
     "renderer-femtovg",
+    "renderer-software",
     "raw-window-handle-06",
 ] }
 tokio = { workspace = true }
@@ -24,6 +25,7 @@ url = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 raw-window-handle = "0.6"
+windows = { version = "0.58", features = ["Win32_UI_WindowsAndMessaging"] }
 
 [build-dependencies]
 slint-build = "=1.8.0"

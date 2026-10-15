@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 fn main() {
+    lingoes_desktop::setup_panic_hook();
     let arguments: Vec<_> = std::env::args().skip(1).collect();
     if arguments.is_empty() || arguments[0] == "gui" || arguments[0] == "--gui" {
         let initial_query =
@@ -27,7 +28,10 @@ fn main() {
                         if let Err(error) =
                             lingoes_desktop::launch_gui_with_options(initial_query, initial_popup)
                         {
-                            eprintln!("{error}");
+                            lingoes_desktop::show_fatal_error(
+                                "Lingoes RS - Startup Error",
+                                &error.to_string(),
+                            );
                             std::process::exit(2);
                         }
                         return;
@@ -48,7 +52,10 @@ fn main() {
             }
         }
         if let Err(error) = lingoes_desktop::launch_gui_with_options(initial_query, initial_popup) {
-            eprintln!("{error}");
+            lingoes_desktop::show_fatal_error(
+                "Lingoes RS - Startup Error",
+                &error.to_string(),
+            );
             std::process::exit(2);
         }
     } else {
