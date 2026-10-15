@@ -4,6 +4,20 @@ A clean-room, Rust-only dictionary, translation, text capture, and text-to-speec
 
 ![Lingoes RS Preview](docs/screenshots/preview.png)
 
+## Latest UI Gallery
+
+### Dictionary lookup and semantic definition view
+
+![Lingoes RS main dictionary window](docs/screenshots/lingoes-rs-main.png)
+
+### Interactive classic menu
+
+![Lingoes RS File menu](docs/screenshots/lingoes-rs-file-menu.png)
+
+### Detailed bilingual dictionary result
+
+![Lingoes RS dictionary detail](docs/screenshots/lingoes-rs-dictionary-detail.png)
+
 ## Principles
 
 - **Pure Rust**: 100% Rust architecture across domain logic, database engines, parsers, capture systems, and GUI (no C# or .NET runtime dependencies).
