@@ -2,6 +2,8 @@
 
 A clean-room, Rust-only dictionary, translation, text capture, and text-to-speech desktop application inspired by the useful workflows of classic Lingoes.
 
+![Lingoes RS Preview](docs/screenshots/preview.png)
+
 ## Principles
 
 - **Pure Rust**: 100% Rust architecture across domain logic, database engines, parsers, capture systems, and GUI (no C# or .NET runtime dependencies).
