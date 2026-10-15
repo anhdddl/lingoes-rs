@@ -29,7 +29,7 @@ component ClassicButton inherits Rectangle {
     in property <bool> enabled: true;
     in property <bool> selected: false;
     callback clicked;
-    height: 23px;
+    height: 24px;
     min-width: 26px;
     border-radius: 3px;
     background: !root.enabled ? #edf2f6 : hit.pressed ? @linear-gradient(180deg, #8ebada 0%, #c7e0f3 100%) : root.selected ? @linear-gradient(180deg, #d9ecfa 0%, #a8d0ef 100%) : hit.has-hover ? @linear-gradient(180deg, #ffffff 0%, #dceaf7 100%) : @linear-gradient(180deg, #fcfdfe 0%, #e2ecf6 100%);
@@ -43,11 +43,14 @@ component ClassicButton inherits Rectangle {
         padding-right: 6px;
         spacing: 4px;
         alignment: center;
-        if root.has-icon : Image {
-            source: root.icon;
+        if root.has-icon : Rectangle {
             width: 14px;
-            height: 14px;
-            vertical-alignment: center;
+            Image {
+                source: root.icon;
+                width: 14px;
+                height: 14px;
+                y: (parent.height - self.height) / 2;
+            }
         }
         if root.text != "" : Text {
             text: root.text;
@@ -128,7 +131,6 @@ component CircleNavButton inherits Rectangle {
 
 component BookIcon inherits Rectangle {
     width: 16px;
-    height: 16px;
     background: transparent;
     Image {
         source: @image-url("assets/search_book.png");
@@ -735,11 +737,14 @@ export component AppWindow inherits Window {
                                             padding-left: 6px;
                                             padding-right: 6px;
                                             spacing: 5px;
-                                            Image {
-                                                source: @image-url("assets/rail_history.png");
+                                            Rectangle {
                                                 width: 13px;
-                                                height: 13px;
-                                                vertical-alignment: center;
+                                                Image {
+                                                    source: @image-url("assets/rail_history.png");
+                                                    width: 13px;
+                                                    height: 13px;
+                                                    y: (parent.height - self.height) / 2;
+                                                }
                                             }
                                             Text {
                                                 text: item;
@@ -769,11 +774,14 @@ export component AppWindow inherits Window {
                                             padding-left: 6px;
                                             padding-right: 6px;
                                             spacing: 5px;
-                                            Image {
-                                                source: @image-url("assets/search_book.png");
+                                            Rectangle {
                                                 width: 13px;
-                                                height: 13px;
-                                                vertical-alignment: center;
+                                                Image {
+                                                    source: @image-url("assets/search_book.png");
+                                                    width: 13px;
+                                                    height: 13px;
+                                                    y: (parent.height - self.height) / 2;
+                                                }
                                             }
                                             Text {
                                                 text: result.headword;
@@ -797,13 +805,16 @@ export component AppWindow inherits Window {
                                 height: 23px;
                             }
                             Rectangle {
-                                height: 78px;
+                                height: 76px;
                                 background: #f8fbfd;
                                 VerticalLayout {
-                                    padding: 6px;
+                                    padding-left: 10px;
+                                    padding-right: 8px;
+                                    padding-top: 6px;
+                                    padding-bottom: 6px;
                                     spacing: 4px;
                                     Text {
-                                        text: root.ui-lang == "vi" ? "• Tra tiền tố & khớp chính xác" : "• Exact + prefix lookup";
+                                        text: root.ui-lang == "vi" ? "• Khớp chính xác & tiền tố" : "• Exact & prefix match";
                                         font-family: "Noto Sans";
                                         font-size: 10px;
                                         color: #58758b;
@@ -817,18 +828,22 @@ export component AppWindow inherits Window {
                                     }
                                     Rectangle { vertical-stretch: 1; }
                                     HorizontalLayout {
-                                        spacing: 4px;
-                                        Image {
-                                            source: @image-url("assets/icon_trash.png");
+                                        spacing: 5px;
+                                        Rectangle {
                                             width: 12px;
-                                            height: 12px;
-                                            vertical-alignment: center;
+                                            Image {
+                                                source: @image-url("assets/icon_trash.png");
+                                                width: 12px;
+                                                height: 12px;
+                                                y: (parent.height - self.height) / 2;
+                                            }
                                         }
                                         Text {
                                             text: root.ui-lang == "vi" ? "Xóa lịch sử" : "Clear history";
                                             font-family: "Noto Sans";
                                             font-size: 10px;
                                             color: #216ba5;
+                                            vertical-alignment: center;
                                         }
                                         Rectangle { horizontal-stretch: 1; }
                                         TouchArea { clicked => { root.clear-history(); } }
@@ -872,9 +887,10 @@ export component AppWindow inherits Window {
                                     width: 1px;
                                     height: 16px;
                                     background: #b0c9df;
-                                    y: (parent.height - self.height) / 2;
+                                    y: 7px;
                                 }
                                 ClassicButton {
+                                    y: 3px;
                                     has-icon: true;
                                     icon: @image-url("assets/act_speaker.png");
                                     text: root.ui-lang == "vi" ? "Phát âm" : "Speak";
@@ -882,12 +898,14 @@ export component AppWindow inherits Window {
                                     clicked => { root.speak(root.selected-headword, "en"); }
                                 }
                                 ClassicButton {
+                                    y: 3px;
                                     has-icon: true;
                                     icon: @image-url("assets/act_stop.png");
                                     text: root.ui-lang == "vi" ? "Dừng" : "Stop";
                                     clicked => { root.stop-tts(); }
                                 }
                                 ClassicButton {
+                                    y: 3px;
                                     has-icon: true;
                                     icon: @image-url("assets/act_copy.png");
                                     text: root.ui-lang == "vi" ? "Sao chép" : "Copy";
@@ -895,6 +913,7 @@ export component AppWindow inherits Window {
                                     clicked => { root.copy-to-clipboard(root.selected-headword + "\\n" + root.selected-definition); }
                                 }
                                 ClassicButton {
+                                    y: 3px;
                                     has-icon: true;
                                     icon: @image-url("assets/act_save.png");
                                     text: root.ui-lang == "vi" ? "Lưu" : "Save";
@@ -902,9 +921,10 @@ export component AppWindow inherits Window {
                                     clicked => { root.export-result-html(); }
                                 }
                                 ClassicButton {
+                                    y: 3px;
                                     has-icon: true;
                                     icon: @image-url("assets/act_find.png");
-                                    text: root.ui-lang == "vi" ? "FTS" : "Find";
+                                    text: root.ui-lang == "vi" ? "Tìm kiếm" : "Find";
                                     clicked => { root.full-text-search(root.query); }
                                 }
                                 Rectangle { horizontal-stretch: 1; }
@@ -1393,12 +1413,16 @@ export component AppWindow inherits Window {
                 spacing: 6px;
                 Rectangle {
                     width: 8px;
-                    height: 8px;
-                    border-radius: 4px;
-                    background: root.status-is-error ? #d94a45 : #2aa84a;
-                    border-color: root.status-is-error ? #992c29 : #177a32;
-                    border-width: 1px;
-                    Rectangle { x: 1px; y: 1px; width: 3px; height: 2px; border-radius: 1px; background: #ffffff80; }
+                    Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 4px;
+                        background: root.status-is-error ? #d94a45 : #2aa84a;
+                        border-color: root.status-is-error ? #992c29 : #177a32;
+                        border-width: 1px;
+                        Rectangle { x: 1px; y: 1px; width: 3px; height: 2px; border-radius: 1px; background: #ffffff80; }
+                    }
                 }
                 Text {
                     text: root.status-text;
