@@ -39,8 +39,8 @@ component ClassicButton inherits Rectangle {
     drop-shadow-offset-y: 1px;
     drop-shadow-color: #00000010;
     HorizontalLayout {
-        padding-left: 4px;
-        padding-right: 4px;
+        padding-left: 6px;
+        padding-right: 6px;
         spacing: 4px;
         alignment: center;
         if root.has-icon : Image {
@@ -60,6 +60,31 @@ component ClassicButton inherits Rectangle {
     }
     hit := TouchArea {
         enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+}
+
+component RailButton inherits Rectangle {
+    in property <image> icon;
+    in property <bool> selected: false;
+    callback clicked;
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    background: hit.pressed ? @linear-gradient(180deg, #8ebada 0%, #c7e0f3 100%) : root.selected ? @linear-gradient(180deg, #d9ecfa 0%, #a8d0ef 100%) : hit.has-hover ? @linear-gradient(180deg, #ffffff 0%, #dceaf7 100%) : transparent;
+    border-color: hit.pressed ? #286b9f : root.selected ? #3f80ab : hit.has-hover ? #5b8cb4 : transparent;
+    border-width: 1px;
+    drop-shadow-blur: root.selected ? 1px : 0px;
+    drop-shadow-offset-y: root.selected ? 1px : 0px;
+    drop-shadow-color: #00000015;
+    Image {
+        source: root.icon;
+        width: 16px;
+        height: 16px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+    }
+    hit := TouchArea {
         clicked => { root.clicked(); }
     }
 }
@@ -109,6 +134,8 @@ component BookIcon inherits Rectangle {
         source: @image-url("assets/search_book.png");
         width: 16px;
         height: 16px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
     }
 }
 
@@ -116,10 +143,8 @@ component SearchActionButton inherits Rectangle {
     in property <string> text;
     in property <bool> enabled: true;
     callback clicked;
-    width: 28px;
+    width: 26px;
     height: 26px;
-    min-width: 28px;
-    max-width: 28px;
     border-radius: 3px;
     background: !root.enabled ? #93b5d1 : hit.pressed ? @linear-gradient(180deg, #0b5b99 0%, #247fbd 100%) : hit.has-hover ? @linear-gradient(180deg, #4aa5e9 0%, #1e6cb3 100%) : @linear-gradient(180deg, #3189c8 0%, #0b66a8 100%);
     border-color: #0d4879;
@@ -514,6 +539,7 @@ export component AppWindow inherits Window {
                         padding-left: 6px;
                         padding-right: 2px;
                         spacing: 4px;
+                        alignment: center;
                         BookIcon { }
                         LineEdit {
                             text <=> root.query;
@@ -539,8 +565,6 @@ export component AppWindow inherits Window {
                     }
                 }
                 SearchActionButton {
-                    text: "▶";
-                    width: 28px;
                     clicked => { root.search(root.query); }
                 }
                 // Web-engine field matching the compact classic toolbar.
@@ -552,8 +576,9 @@ export component AppWindow inherits Window {
                     border-radius: 2px;
                     HorizontalLayout {
                         padding-left: 6px;
-                        padding-right: 4px;
-                        spacing: 3px;
+                        padding-right: 6px;
+                        spacing: 4px;
+                        alignment: center;
                         Text {
                             text: "Google";
                             color: #557591;
@@ -644,49 +669,50 @@ export component AppWindow inherits Window {
 
                         // Left Icon Rail
                         Rectangle {
-                            width: 30px;
+                            width: 28px;
                             background: @linear-gradient(90deg, #e4eff7 0%, #edf5fc 100%);
                             border-color: #b8cee2;
                             border-width: 1px;
                             VerticalLayout {
                                 padding-top: 6px;
                                 spacing: 4px;
-                                ClassicButton {
-                                    has-icon: true;
-                                    icon: @image-url("assets/rail_index.png");
-                                    width: 26px;
-                                    height: 24px;
-                                    selected: !root.show-history-tab;
-                                    clicked => { root.show-history-tab = false; }
+                                alignment: start;
+                                HorizontalLayout {
+                                    alignment: center;
+                                    RailButton {
+                                        icon: @image-url("assets/rail_index.png");
+                                        selected: !root.show-history-tab;
+                                        clicked => { root.show-history-tab = false; }
+                                    }
                                 }
-                                ClassicButton {
-                                    has-icon: true;
-                                    icon: @image-url("assets/rail_history.png");
-                                    width: 26px;
-                                    height: 24px;
-                                    selected: root.show-history-tab;
-                                    clicked => { root.show-history-tab = true; }
+                                HorizontalLayout {
+                                    alignment: center;
+                                    RailButton {
+                                        icon: @image-url("assets/rail_history.png");
+                                        selected: root.show-history-tab;
+                                        clicked => { root.show-history-tab = true; }
+                                    }
                                 }
-                                ClassicButton {
-                                    has-icon: true;
-                                    icon: @image-url("assets/rail_translate.png");
-                                    width: 26px;
-                                    height: 24px;
-                                    clicked => { root.active-tab = 1; }
+                                HorizontalLayout {
+                                    alignment: center;
+                                    RailButton {
+                                        icon: @image-url("assets/rail_translate.png");
+                                        clicked => { root.active-tab = 1; }
+                                    }
                                 }
-                                ClassicButton {
-                                    has-icon: true;
-                                    icon: @image-url("assets/rail_dicts.png");
-                                    width: 26px;
-                                    height: 24px;
-                                    clicked => { root.active-tab = 2; }
+                                HorizontalLayout {
+                                    alignment: center;
+                                    RailButton {
+                                        icon: @image-url("assets/rail_dicts.png");
+                                        clicked => { root.active-tab = 2; }
+                                    }
                                 }
-                                ClassicButton {
-                                    has-icon: true;
-                                    icon: @image-url("assets/rail_settings.png");
-                                    width: 26px;
-                                    height: 24px;
-                                    clicked => { root.active-tab = 3; }
+                                HorizontalLayout {
+                                    alignment: center;
+                                    RailButton {
+                                        icon: @image-url("assets/rail_settings.png");
+                                        clicked => { root.active-tab = 3; }
+                                    }
                                 }
                             }
                         }
@@ -831,23 +857,27 @@ export component AppWindow inherits Window {
                             border-width: 1px;
                             HorizontalLayout {
                                 padding-left: 8px;
-                                padding-right: 6px;
-                                spacing: 4px;
+                                padding-right: 8px;
+                                spacing: 6px;
+                                alignment: start;
                                 Text {
                                     text: root.selected-headword == "" ? (root.ui-lang == "vi" ? "Trang chủ" : "Start Page") : root.selected-headword;
                                     color: #10385c;
                                     font-family: "Noto Sans";
-                                    font-size: 14px;
+                                    font-size: 13px;
                                     font-weight: 700;
                                     vertical-alignment: center;
-                                    overflow: elide;
-                                    horizontal-stretch: 1;
+                                }
+                                Rectangle {
+                                    width: 1px;
+                                    height: 16px;
+                                    background: #b0c9df;
+                                    y: (parent.height - self.height) / 2;
                                 }
                                 ClassicButton {
                                     has-icon: true;
                                     icon: @image-url("assets/act_speaker.png");
                                     text: root.ui-lang == "vi" ? "Phát âm" : "Speak";
-                                    width: root.ui-lang == "vi" ? 76px : 68px;
                                     enabled: root.selected-headword != "";
                                     clicked => { root.speak(root.selected-headword, "en"); }
                                 }
@@ -855,14 +885,12 @@ export component AppWindow inherits Window {
                                     has-icon: true;
                                     icon: @image-url("assets/act_stop.png");
                                     text: root.ui-lang == "vi" ? "Dừng" : "Stop";
-                                    width: root.ui-lang == "vi" ? 60px : 54px;
                                     clicked => { root.stop-tts(); }
                                 }
                                 ClassicButton {
                                     has-icon: true;
                                     icon: @image-url("assets/act_copy.png");
                                     text: root.ui-lang == "vi" ? "Sao chép" : "Copy";
-                                    width: root.ui-lang == "vi" ? 78px : 62px;
                                     enabled: root.selected-headword != "";
                                     clicked => { root.copy-to-clipboard(root.selected-headword + "\\n" + root.selected-definition); }
                                 }
@@ -870,7 +898,6 @@ export component AppWindow inherits Window {
                                     has-icon: true;
                                     icon: @image-url("assets/act_save.png");
                                     text: root.ui-lang == "vi" ? "Lưu" : "Save";
-                                    width: 54px;
                                     enabled: root.selected-headword != "";
                                     clicked => { root.export-result-html(); }
                                 }
@@ -878,9 +905,9 @@ export component AppWindow inherits Window {
                                     has-icon: true;
                                     icon: @image-url("assets/act_find.png");
                                     text: root.ui-lang == "vi" ? "FTS" : "Find";
-                                    width: 54px;
                                     clicked => { root.full-text-search(root.query); }
                                 }
+                                Rectangle { horizontal-stretch: 1; }
                             }
                         }
 
