@@ -330,7 +330,8 @@ fn formatted_lines_handle_section_labels_and_number_styles_without_false_pos() {
 fn test_parse_formatted_lines_parses_stardict_plain_markers() {
     use lingoes_core::{FormattedLine, parse_formatted_lines};
 
-    let raw = "* verb - To greet, to salute =chào cờ+to salute the flag =chào từ biệt+to say good-bye";
+    let raw =
+        "* verb - To greet, to salute =chào cờ+to salute the flag =chào từ biệt+to say good-bye";
     assert_eq!(
         parse_formatted_lines(raw),
         vec![

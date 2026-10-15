@@ -1156,7 +1156,10 @@ fn classify_display_segment(trimmed: &str) -> Vec<FormattedLine> {
         };
         return vec![FormattedLine::new("example", "▸", formatted)];
     }
-    if let Some(body) = trimmed.strip_prefix('-').or_else(|| trimmed.strip_prefix('–')) {
+    if let Some(body) = trimmed
+        .strip_prefix('-')
+        .or_else(|| trimmed.strip_prefix('–'))
+    {
         return vec![FormattedLine::new("sense", "•", body.trim())];
     }
     if let Some(body) = trimmed.strip_prefix('•') {
@@ -1203,9 +1206,11 @@ fn is_part_of_speech(text: &str) -> bool {
         "v",
         "n",
     ];
-    TOKENS
-        .iter()
-        .any(|token| text == *token || text.starts_with(&format!("{token} ")) || text.starts_with(&format!("{token}.")))
+    TOKENS.iter().any(|token| {
+        text == *token
+            || text.starts_with(&format!("{token} "))
+            || text.starts_with(&format!("{token}."))
+    })
 }
 
 fn try_split_numbered_sense(text: &str) -> Option<(String, String)> {

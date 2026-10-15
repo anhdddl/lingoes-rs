@@ -180,6 +180,22 @@ impl DesktopApp {
         self.settings = settings;
     }
 
+    pub fn language(&self) -> &str {
+        &self.settings.shell.language
+    }
+
+    pub fn set_language(&mut self, language: impl Into<String>) {
+        let lang = language.into();
+        self.settings.shell.language = lang;
+        if self.results.is_empty() && self.selected_index.is_none() {
+            self.status = if self.language() == "en" {
+                "Ready".into()
+            } else {
+                "Sẵn sàng".into()
+            };
+        }
+    }
+
     pub fn search(&mut self, query: &str) {
         self.last_live_query = query.trim().to_string();
         self.search_with_mode(query, false);
@@ -205,7 +221,11 @@ impl DesktopApp {
         let Ok(query) = LookupQuery::new(query) else {
             self.results.clear();
             self.selected_index = None;
-            self.status = "Nhập từ khóa để tra cứu".into();
+            self.status = if self.language() == "en" {
+                "Enter a word or phrase to look up".into()
+            } else {
+                "Nhập từ khóa để tra cứu".into()
+            };
             self.has_error = false;
             return;
         };
@@ -218,10 +238,18 @@ impl DesktopApp {
             Ok(results) => {
                 self.results = results;
                 self.selected_index = (!self.results.is_empty()).then_some(0);
-                self.status = match self.results.len() {
-                    0 => "Không tìm thấy từ phù hợp".into(),
-                    1 => "Tìm thấy 1 kết quả".into(),
-                    count => format!("Tìm thấy {count} kết quả"),
+                self.status = if self.language() == "en" {
+                    match self.results.len() {
+                        0 => "No matching words found".into(),
+                        1 => "Found 1 result".into(),
+                        count => format!("Found {count} results"),
+                    }
+                } else {
+                    match self.results.len() {
+                        0 => "Không tìm thấy từ phù hợp".into(),
+                        1 => "Tìm thấy 1 kết quả".into(),
+                        count => format!("Tìm thấy {count} kết quả"),
+                    }
                 };
                 self.has_error = false;
             }
@@ -453,12 +481,20 @@ impl DesktopApp {
     pub fn stop_tts(&mut self) -> Result<(), AppError> {
         match self.tts.stop() {
             Ok(()) => {
-                self.status = "Đã dừng phát âm".into();
+                self.status = if self.language() == "en" {
+                    "Speech stopped".into()
+                } else {
+                    "Đã dừng phát âm".into()
+                };
                 self.has_error = false;
                 Ok(())
             }
             Err(TtsError::Unsupported(_)) => {
-                self.status = "Dừng phát âm không khả dụng trên hệ thống này".into();
+                self.status = if self.language() == "en" {
+                    "Stop speech is not supported on this platform".into()
+                } else {
+                    "Dừng phát âm không khả dụng trên hệ thống này".into()
+                };
                 self.has_error = false;
                 Ok(())
             }
@@ -480,7 +516,11 @@ impl DesktopApp {
         board
             .set_text(text)
             .map_err(|e| AppError(format!("Lỗi sao chép vào clipboard: {e}")))?;
-        self.status = "Đã sao chép vào bộ nhớ tạm".into();
+        self.status = if self.language() == "en" {
+            "Copied to clipboard".into()
+        } else {
+            "Đã sao chép vào bộ nhớ tạm".into()
+        };
         self.has_error = false;
         Ok(())
     }
@@ -1257,6 +1297,23 @@ pub fn launch_gui_with_options(
         });
     }
 
+    // Change UI language callback
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        let popup_weak = popup_window.as_weak();
+        window.on_change_language(move |lang| {
+            let mut app = application.lock().unwrap();
+            app.set_language(lang.as_str());
+            if let Some(w) = window_weak.upgrade() {
+                w.set_ui_lang(lang.clone());
+            }
+            if let Some(p) = popup_weak.upgrade() {
+                p.set_ui_lang(lang);
+            }
+        });
+    }
+
     if let Some(query) = initial_query {
         let mut app = application.lock().unwrap();
         app.search(query);
@@ -1319,6 +1376,7 @@ fn attach_windows_popup_adapter(
 }
 
 fn update_popup_window(window: &PopupWindow, application: &DesktopApp) {
+    window.set_ui_lang(application.language().into());
     window.set_headword(application.quick_popup_word().into());
     let formatted_def = lingoes_core::format_definition_for_display(application.quick_popup_def());
     window.set_definition(formatted_def.into());
@@ -1467,6 +1525,7 @@ fn update_window(window: &AppWindow, application: &DesktopApp) {
     ));
     window.set_ocr_fallback_enabled(application.settings().capture.ocr_enabled);
     window.set_auto_pronounce_enabled(application.settings().popup.auto_pronounce);
+    window.set_ui_lang(application.language().into());
 
     window.set_status_text(application.status().into());
     window.set_status_is_error(application.has_error());
@@ -1721,8 +1780,8 @@ pub fn show_fatal_error(title: &str, message: &str) {
     }
     #[cfg(windows)]
     {
+        use windows::Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_OK, MessageBoxW};
         use windows::core::HSTRING;
-        use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
         let title_h = HSTRING::from(title);
         let message_h = HSTRING::from(message);
         unsafe {
@@ -2143,6 +2202,31 @@ mod tests {
         updated.shell.close_to_tray = true;
         app.set_settings(updated);
         assert!(app.settings().shell.close_to_tray);
+        let _ = std::fs::remove_file(database_path);
+    }
+
+    #[test]
+    fn desktop_app_language_switching_and_bilingual_status() {
+        let database_path = temporary_path("language-test", "db");
+        let mut app = DesktopApp::open(&database_path).unwrap();
+        assert_eq!(app.language(), "vi");
+
+        // Status reflects default Vietnamese
+        app.search("");
+        assert_eq!(app.status(), "Nhập từ khóa để tra cứu");
+
+        // Switch to English
+        app.set_language("en");
+        assert_eq!(app.language(), "en");
+        app.search("");
+        assert_eq!(app.status(), "Enter a word or phrase to look up");
+
+        // Switch back to Vietnamese
+        app.set_language("vi");
+        assert_eq!(app.language(), "vi");
+        app.search("");
+        assert_eq!(app.status(), "Nhập từ khóa để tra cứu");
+
         let _ = std::fs::remove_file(database_path);
     }
 

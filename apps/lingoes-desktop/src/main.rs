@@ -52,10 +52,7 @@ fn main() {
             }
         }
         if let Err(error) = lingoes_desktop::launch_gui_with_options(initial_query, initial_popup) {
-            lingoes_desktop::show_fatal_error(
-                "Lingoes RS - Startup Error",
-                &error.to_string(),
-            );
+            lingoes_desktop::show_fatal_error("Lingoes RS - Startup Error", &error.to_string());
             std::process::exit(2);
         }
     } else {

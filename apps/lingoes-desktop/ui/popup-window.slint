@@ -1,9 +1,12 @@
+import "./fonts/NotoSans-Regular.ttf";
+import "./fonts/NotoSans-Bold.ttf";
 import { Button, ScrollView } from "std-widgets.slint";
 
 // A standalone lookup surface. AppWindow keeps its legacy quick-popup API
 // until the Rust controller is migrated to own this window.
 export component PopupWindow inherits Window {
-    title: root.headword == "" ? "Lingoes quick lookup" : root.headword + " — Lingoes";
+    default-font-family: "Noto Sans";
+    title: root.headword == "" ? "Lingoes quick lookup" : (root.headword + " — Lingoes");
     preferred-width: root.expanded ? 560px : 340px;
     preferred-height: root.expanded ? 480px : 180px;
     min-width: 320px;
@@ -11,6 +14,7 @@ export component PopupWindow inherits Window {
     background: #ffffff;
     forward-focus: keyboard;
 
+    in property <string> ui-lang: "vi";
     in property <string> headword;
     in property <string> definition;
     in property <string> dictionary-name;
@@ -55,7 +59,7 @@ export component PopupWindow inherits Window {
                 spacing: 6px;
 
                 Text {
-                    text: root.headword == "" ? "Quick lookup" : root.headword;
+                    text: root.headword == "" ? (root.ui-lang == "vi" ? "Tra nhanh" : "Quick lookup") : root.headword;
                     color: #ffffff;
                     font-size: 20px;
                     font-weight: 800;
@@ -65,12 +69,12 @@ export component PopupWindow inherits Window {
                 }
 
                 Button {
-                    text: root.pinned ? "Unpin" : "Pin";
+                    text: root.pinned ? (root.ui-lang == "vi" ? "Bỏ ghim" : "Unpin") : (root.ui-lang == "vi" ? "Ghim" : "Pin");
                     accessible-label: root.pinned ? "Unpin quick lookup window" : "Pin quick lookup window";
                     clicked => { root.pin(!root.pinned); }
                 }
                 Button {
-                    text: "Close";
+                    text: root.ui-lang == "vi" ? "Đóng" : "Close";
                     accessible-label: "Close quick lookup window";
                     clicked => { root.close(); }
                 }
@@ -97,7 +101,7 @@ export component PopupWindow inherits Window {
 
                 Text {
                     width: parent.width;
-                    text: root.definition == "" ? "No definition available." : root.definition;
+                    text: root.definition == "" ? (root.ui-lang == "vi" ? "Chưa có định nghĩa tra cứu." : "No definition available.") : root.definition;
                     color: #111827;
                     font-size: root.expanded ? 16px : 14px;
                     wrap: word-wrap;
@@ -118,43 +122,43 @@ export component PopupWindow inherits Window {
             spacing: 6px;
 
             Button {
-                text: "Previous";
-                accessible-label: "Previous lookup result";
+                text: root.ui-lang == "vi" ? "Trước" : "Previous";
+                accessible-label: root.ui-lang == "vi" ? "Kết quả trước" : "Previous lookup result";
                 enabled: root.can-go-previous;
                 clicked => { root.previous(); }
             }
             Button {
-                text: "Next";
-                accessible-label: "Next lookup result";
+                text: root.ui-lang == "vi" ? "Tiếp" : "Next";
+                accessible-label: root.ui-lang == "vi" ? "Kết quả kế tiếp" : "Next lookup result";
                 enabled: root.can-go-next;
                 clicked => { root.next(); }
             }
             Button {
-                text: "Copy";
-                accessible-label: "Copy lookup result";
+                text: root.ui-lang == "vi" ? "Sao chép" : "Copy";
+                accessible-label: root.ui-lang == "vi" ? "Sao chép kết quả" : "Copy lookup result";
                 clicked => { root.copy(); }
             }
             Button {
-                text: "Speak";
-                accessible-label: "Speak headword";
+                text: root.ui-lang == "vi" ? "Phát âm" : "Speak";
+                accessible-label: root.ui-lang == "vi" ? "Phát âm từ" : "Speak headword";
                 clicked => { root.speak(); }
             }
             Button {
-                text: "Stop";
-                accessible-label: "Stop speech";
+                text: root.ui-lang == "vi" ? "Dừng" : "Stop";
+                accessible-label: root.ui-lang == "vi" ? "Dừng giọng nói" : "Stop speech";
                 clicked => { root.stop(); }
             }
 
             Rectangle { horizontal-stretch: 1; }
 
             Button {
-                text: root.expanded ? "Compact" : "Expand";
-                accessible-label: root.expanded ? "Use compact view" : "Use expanded view";
+                text: root.expanded ? (root.ui-lang == "vi" ? "Thu gọn" : "Compact") : (root.ui-lang == "vi" ? "Mở rộng" : "Expand");
+                accessible-label: root.expanded ? (root.ui-lang == "vi" ? "Dạng thu gọn" : "Use compact view") : (root.ui-lang == "vi" ? "Dạng mở rộng" : "Use expanded view");
                 clicked => { root.expand(!root.expanded); }
             }
             if root.expanded : Button {
-                text: "Open main";
-                accessible-label: "Open result in main window";
+                text: root.ui-lang == "vi" ? "Màn hình chính" : "Open main";
+                accessible-label: root.ui-lang == "vi" ? "Mở kết quả trong cửa sổ chính" : "Open result in main window";
                 clicked => { root.open-main(); }
             }
         }

@@ -1,3 +1,5 @@
+import "./fonts/NotoSans-Regular.ttf";
+import "./fonts/NotoSans-Bold.ttf";
 import { CheckBox, LineEdit, ListView, ScrollView, TextEdit } from "std-widgets.slint";
 export struct SearchResult { headword: string, definition: string, dictionary-name: string, }
 export struct DictionaryItem { id: int, name: string, format: string, entry-count: int, enabled: bool, }
@@ -21,7 +23,7 @@ component ClassicButton inherits Rectangle {
     Text {
         text: root.text;
         color: root.enabled ? (root.selected ? #0b375d : #174d7b) : #8599a8;
-        font-family: "Tahoma";
+        font-family: "Noto Sans";
         font-size: 11px;
         font-weight: root.selected ? 700 : 400;
         horizontal-alignment: center;
@@ -50,7 +52,7 @@ component CircleNavButton inherits Rectangle {
     Text {
         text: root.text;
         color: root.enabled ? #174d7b : #9cb1c2;
-        font-family: "Tahoma";
+        font-family: "Noto Sans";
         font-size: 12px;
         font-weight: 700;
         horizontal-alignment: center;
@@ -86,7 +88,7 @@ component SearchActionButton inherits Rectangle {
     Text {
         text: root.text;
         color: white;
-        font-family: "Tahoma";
+        font-family: "Noto Sans";
         font-size: 11px;
         font-weight: 700;
         horizontal-alignment: center;
@@ -117,7 +119,7 @@ component TopTabButton inherits Rectangle {
         Text {
             text: root.text;
             color: root.selected ? #0e375e : #234c73;
-            font-family: "Tahoma";
+            font-family: "Noto Sans";
             font-size: 11px;
             font-weight: root.selected ? 700 : 400;
             vertical-alignment: center;
@@ -134,16 +136,18 @@ component TopTabButton inherits Rectangle {
         clicked => { root.clicked(); }
     }
 }
-component SectionTitle inherits Rectangle { in property <string> text; height: 27px; background: #d8e9f6; border-color: #9ebbd0; border-width: 1px; Text { text: root.text; x: 7px; width: parent.width - 14px; height: parent.height; color: #174d7b; font-family: "Tahoma"; font-size: 12px; font-weight: 700; vertical-alignment: center; } }
+component SectionTitle inherits Rectangle { in property <string> text; height: 27px; background: #d8e9f6; border-color: #9ebbd0; border-width: 1px; Text { text: root.text; x: 7px; width: parent.width - 14px; height: parent.height; color: #174d7b; font-family: "Noto Sans"; font-size: 12px; font-weight: 700; vertical-alignment: center; } }
 export component AppWindow inherits Window {
+ default-font-family: "Noto Sans";
  title: "Lingoes RS - Dictionary and Text Translation"; preferred-width: 860px; preferred-height: 650px; min-width: 730px; min-height: 500px; background: #fffdf0;
+ in-out property <string> ui-lang: "vi";
  in-out property <int> active-tab: 0;
  in-out property <string> query; in property <[SearchResult]> results; in property <int> selected-index: -1; in property <string> selected-headword; in property <string> selected-definition; in property <string> selected-dict-badge; in property <[FormattedEntryLine]> definition-lines: []; in property <bool> can-go-back: false; in property <bool> can-go-forward: false; in-out property <bool> private-mode: false; in-out property <int> active-group-index: 0; in-out property <bool> show-history-tab: false; in property <[string]> history-items;
  in-out property <string> translate-source-text; in-out property <string> translate-target-text; in-out property <string> translate-from-lang: "auto"; in-out property <string> translate-to-lang: "vi"; in-out property <string> translate-engine: "google"; in property <bool> is-translating: false;
  in property <[DictionaryItem]> dictionaries; in-out property <string> import-path; in-out property <string> import-name;
  in-out property <bool> clipboard-monitor-enabled: false; in-out property <bool> cursor-capture-enabled: false; in-out property <bool> selection-capture-enabled: false; in-out property <bool> ocr-fallback-enabled: false; in-out property <string> openai-base-url: "http://localhost:20128/v1"; in-out property <string> openai-model: "auto"; in-out property <string> openai-api-key: ""; in-out property <string> default-target-lang: "vi";
  in property <string> status-text: "Sẵn sàng"; in property <bool> status-is-error: false; in-out property <bool> auto-pronounce-enabled: false;
- callback search(string); callback live-search(string); callback full-text-search(string); callback web-search(string, string); callback select-result(int); callback navigate-back(); callback navigate-forward(); callback speak(string, string); callback stop-tts(); callback copy-to-clipboard(string); callback export-result-html(); callback translate(string, string, string, string); callback cancel-translation(); callback import-dictionary(string, string); callback toggle-dictionary(int, bool); callback delete-dictionary(int); callback toggle-clipboard-monitor(bool); callback toggle-auto-pronounce(bool); callback configure-capture(bool, bool, bool);
+ callback search(string); callback live-search(string); callback full-text-search(string); callback web-search(string, string); callback select-result(int); callback navigate-back(); callback navigate-forward(); callback speak(string, string); callback stop-tts(); callback copy-to-clipboard(string); callback export-result-html(); callback translate(string, string, string, string); callback cancel-translation(); callback import-dictionary(string, string); callback toggle-dictionary(int, bool); callback delete-dictionary(int); callback toggle-clipboard-monitor(bool); callback toggle-auto-pronounce(bool); callback configure-capture(bool, bool, bool); callback change-language(string);
  VerticalLayout { spacing: 0px;
   Rectangle { height: 28px; background: #2570ab;
    Rectangle { y: 0px; height: 1px; background: #68a7d7; }
@@ -152,30 +156,49 @@ export component AppWindow inherits Window {
      Rectangle { x: 2px; y: 2px; width: 9px; height: 9px; border-radius: 4px; background: #fdd835; }
      Rectangle { x: 10px; y: 4px; width: 6px; height: 5px; background: #f44336; }
     }
-    Text { text: "LINGOES"; color: white; font-family: "Tahoma"; font-size: 15px; font-weight: 700; vertical-alignment: center; }
-    Text { text: "Dictionary and Text Translation"; color: #d6e9f8; font-family: "Tahoma"; font-size: 11px; vertical-alignment: center; }
+    Text { text: "LINGOES"; color: white; font-family: "Noto Sans"; font-size: 15px; font-weight: 700; vertical-alignment: center; }
+    Text { text: root.ui-lang == "vi" ? "Từ điển và Dịch thuật" : "Dictionary and Text Translation"; color: #d6e9f8; font-family: "Noto Sans"; font-size: 11px; vertical-alignment: center; }
     Rectangle { horizontal-stretch: 1; }
+    HorizontalLayout {
+     spacing: 3px;
+     y: 4px;
+     height: 20px;
+     ClassicButton {
+      text: "Tiếng Việt";
+      width: 72px;
+      height: 20px;
+      selected: root.ui-lang == "vi";
+      clicked => { root.ui-lang = "vi"; root.change-language("vi"); }
+     }
+     ClassicButton {
+      text: "English";
+      width: 58px;
+      height: 20px;
+      selected: root.ui-lang == "en";
+      clicked => { root.ui-lang = "en"; root.change-language("en"); }
+     }
+    }
     Text { text: "Lingoes RS"; color: #d6e9f8; font-size: 11px; vertical-alignment: center; }
    }
   }
   Rectangle { height: 50px; background: #d4e4f2; border-color: #86a7c0; border-width: 1px;
    VerticalLayout { padding: 2px; spacing: 2px;
     HorizontalLayout { height: 16px; spacing: 16px; padding-left: 4px;
-     Text { text: "File"; color: #173f61; font-family: "Tahoma"; font-size: 11px; }
-     Text { text: "Edit"; color: #173f61; font-family: "Tahoma"; font-size: 11px; }
-     Text { text: "View"; color: #173f61; font-family: "Tahoma"; font-size: 11px; }
-     Text { text: "Options"; color: #173f61; font-family: "Tahoma"; font-size: 11px; }
-     Text { text: "Help"; color: #173f61; font-family: "Tahoma"; font-size: 11px; }
+     Text { text: root.ui-lang == "vi" ? "Tập tin" : "File"; color: #173f61; font-family: "Noto Sans"; font-size: 11px; }
+     Text { text: root.ui-lang == "vi" ? "Chỉnh sửa" : "Edit"; color: #173f61; font-family: "Noto Sans"; font-size: 11px; }
+     Text { text: root.ui-lang == "vi" ? "Hiển thị" : "View"; color: #173f61; font-family: "Noto Sans"; font-size: 11px; }
+     Text { text: root.ui-lang == "vi" ? "Tùy chọn" : "Options"; color: #173f61; font-family: "Noto Sans"; font-size: 11px; }
+     Text { text: root.ui-lang == "vi" ? "Trợ giúp" : "Help"; color: #173f61; font-family: "Noto Sans"; font-size: 11px; }
      Rectangle { horizontal-stretch: 1; }
     }
     HorizontalLayout { spacing: 2px;
-     TopTabButton { text: "Dictionary"; selected: root.active-tab == 0; clicked => { root.active-tab = 0; } }
-     TopTabButton { text: "Text Translation"; selected: root.active-tab == 1; clicked => { root.active-tab = 1; } }
-     TopTabButton { text: "Dictionaries"; selected: root.active-tab == 2; clicked => { root.active-tab = 2; } }
-     TopTabButton { text: "Settings"; selected: root.active-tab == 3; clicked => { root.active-tab = 3; } }
+     TopTabButton { text: root.ui-lang == "vi" ? "Tra cứu" : "Dictionary"; selected: root.active-tab == 0; clicked => { root.active-tab = 0; } }
+     TopTabButton { text: root.ui-lang == "vi" ? "Dịch văn bản" : "Text Translation"; selected: root.active-tab == 1; clicked => { root.active-tab = 1; } }
+     TopTabButton { text: root.ui-lang == "vi" ? "Quản lý từ điển" : "Dictionaries"; selected: root.active-tab == 2; clicked => { root.active-tab = 2; } }
+     TopTabButton { text: root.ui-lang == "vi" ? "Cài đặt" : "Settings"; selected: root.active-tab == 3; clicked => { root.active-tab = 3; } }
      Rectangle { width: 1px; background: #8aa8be; }
-     TopTabButton { text: "Auto Match"; selected: root.clipboard-monitor-enabled; clicked => { root.clipboard-monitor-enabled = !root.clipboard-monitor-enabled; root.toggle-clipboard-monitor(root.clipboard-monitor-enabled); } }
-     TopTabButton { text: "Private"; selected: root.private-mode; clicked => { root.private-mode = !root.private-mode; } }
+     TopTabButton { text: root.ui-lang == "vi" ? "Bắt chữ tự động" : "Auto Match"; selected: root.clipboard-monitor-enabled; clicked => { root.clipboard-monitor-enabled = !root.clipboard-monitor-enabled; root.toggle-clipboard-monitor(root.clipboard-monitor-enabled); } }
+     TopTabButton { text: root.ui-lang == "vi" ? "Riêng tư" : "Private"; selected: root.private-mode; clicked => { root.private-mode = !root.private-mode; } }
      Rectangle { horizontal-stretch: 1; }
     }
    }
@@ -187,7 +210,7 @@ export component AppWindow inherits Window {
     Rectangle { horizontal-stretch: 1; background: white; border-color: #729bbd; border-width: 1px; border-radius: 2px;
      HorizontalLayout { padding-left: 6px; padding-right: 2px; spacing: 4px;
       BookIcon { }
-      LineEdit { text <=> root.query; placeholder-text: "Type a word to look up..."; edited(value) => { root.live-search(value); } accepted => { root.search(root.query); } }
+      LineEdit { text <=> root.query; placeholder-text: root.ui-lang == "vi" ? "Nhập từ cần tra..." : "Type a word to look up..."; edited(value) => { root.live-search(value); } accepted => { root.search(root.query); } }
       Rectangle { width: 18px; background: #edf4fa; border-color: #b5c9d9; border-width: 1px; Text { text: "▾"; color: #50718d; horizontal-alignment: center; vertical-alignment: center; font-size: 9px; } TouchArea { clicked => { root.show-history-tab = true; } } }
      }
     }
@@ -206,42 +229,42 @@ export component AppWindow inherits Window {
       ClassicButton { text: "D"; width: 24px; height: 24px; clicked => { root.active-tab = 2; } }
      } }
      VerticalLayout { spacing: 0px;
-      SectionTitle { text: root.show-history-tab ? "History" : "Results"; height: 27px; }
-      Rectangle { vertical-stretch: 1; background: white; if root.show-history-tab : ListView { for item in root.history-items : Rectangle { height: 23px; background: hhit.has-hover ? #f4f9fd : white; Text { text: item; x: 7px; width: parent.width - 14px; height: parent.height; color: #173f61; font-family: "Tahoma"; font-size: 11px; vertical-alignment: center; overflow: elide; } hhit := TouchArea { clicked => { root.query = item; root.search(item); } } } } if !root.show-history-tab : ListView { for result[index] in root.results : Rectangle { height: 23px; background: index == root.selected-index ? #d9ecfa : rhit.has-hover ? #f4f9fd : white; border-color: #edf2f5; border-width: 1px; Text { text: result.headword; x: 7px; width: parent.width - 14px; height: parent.height; color: #173f61; font-family: "Tahoma"; font-size: 11px; vertical-alignment: center; overflow: elide; } rhit := TouchArea { clicked => { root.select-result(index); } } } } }
-      SectionTitle { text: "Options"; height: 27px; }
-      Rectangle { height: 75px; background: #f8fbfd; VerticalLayout { padding: 6px; spacing: 4px; Text { text: "Exact + prefix lookup"; font-family: "Tahoma"; font-size: 10px; color: #58758b; } Text { text: root.results.length + " matches"; font-family: "Tahoma"; font-size: 10px; color: #58758b; } } }
+      SectionTitle { text: root.show-history-tab ? (root.ui-lang == "vi" ? "Lịch sử" : "History") : (root.ui-lang == "vi" ? "Kết quả" : "Results"); height: 27px; }
+      Rectangle { vertical-stretch: 1; background: white; if root.show-history-tab : ListView { for item in root.history-items : Rectangle { height: 23px; background: hhit.has-hover ? #f4f9fd : white; Text { text: item; x: 7px; width: parent.width - 14px; height: parent.height; color: #173f61; font-family: "Noto Sans"; font-size: 11px; vertical-alignment: center; overflow: elide; } hhit := TouchArea { clicked => { root.query = item; root.search(item); } } } } if !root.show-history-tab : ListView { for result[index] in root.results : Rectangle { height: 23px; background: index == root.selected-index ? #d9ecfa : rhit.has-hover ? #f4f9fd : white; border-color: #edf2f5; border-width: 1px; Text { text: result.headword; x: 7px; width: parent.width - 14px; height: parent.height; color: #173f61; font-family: "Noto Sans"; font-size: 11px; vertical-alignment: center; overflow: elide; } rhit := TouchArea { clicked => { root.select-result(index); } } } } }
+      SectionTitle { text: root.ui-lang == "vi" ? "Tùy chọn" : "Options"; height: 27px; }
+      Rectangle { height: 75px; background: #f8fbfd; VerticalLayout { padding: 6px; spacing: 4px; Text { text: root.ui-lang == "vi" ? "Tra tiền tố & khớp chính xác" : "Exact + prefix lookup"; font-family: "Noto Sans"; font-size: 10px; color: #58758b; } Text { text: root.results.length + (root.ui-lang == "vi" ? " mục tìm thấy" : " matches"); font-family: "Noto Sans"; font-size: 10px; color: #58758b; } } }
      }
     } }
     Rectangle { horizontal-stretch: 1; background: #f5f8fa; border-color: #91aec3; border-width: 1px; VerticalLayout { spacing: 0px;
-     Rectangle { height: 29px; background: #eef5fb; border-color: #b4cbe0; border-width: 1px; HorizontalLayout { padding-left: 8px; padding-right: 6px; spacing: 4px; Text { text: root.selected-headword == "" ? "Start Page" : root.selected-headword; color: #10385c; font-family: "Tahoma"; font-size: 15px; font-weight: 700; vertical-alignment: center; overflow: elide; } if root.selected-dict-badge != "" : Text { text: "[" + root.selected-dict-badge + "]"; color: #58758b; font-family: "Tahoma"; font-size: 11px; vertical-alignment: center; } Rectangle { horizontal-stretch: 1; } ClassicButton { text: "Speak"; width: 50px; height: 22px; enabled: root.selected-headword != ""; clicked => { root.speak(root.selected-headword, "en"); } } ClassicButton { text: "Stop"; width: 44px; height: 22px; clicked => { root.stop-tts(); } } ClassicButton { text: "Copy"; width: 46px; height: 22px; enabled: root.selected-headword != ""; clicked => { root.copy-to-clipboard(root.selected-headword + "\n" + root.selected-definition); } } ClassicButton { text: "Save"; width: 44px; height: 22px; enabled: root.selected-headword != ""; clicked => { root.export-result-html(); } } ClassicButton { text: "Find"; width: 42px; height: 22px; clicked => { root.full-text-search(root.query); } } } }
+     Rectangle { height: 29px; background: #eef5fb; border-color: #b4cbe0; border-width: 1px; HorizontalLayout { padding-left: 8px; padding-right: 6px; spacing: 4px; Text { text: root.selected-headword == "" ? (root.ui-lang == "vi" ? "Trang chủ" : "Start Page") : root.selected-headword; color: #10385c; font-family: "Noto Sans"; font-size: 15px; font-weight: 700; vertical-alignment: center; overflow: elide; } if root.selected-dict-badge != "" : Text { text: "[" + root.selected-dict-badge + "]"; color: #58758b; font-family: "Noto Sans"; font-size: 11px; vertical-alignment: center; } Rectangle { horizontal-stretch: 1; } ClassicButton { text: root.ui-lang == "vi" ? "Phát âm" : "Speak"; width: root.ui-lang == "vi" ? 62px : 50px; height: 22px; enabled: root.selected-headword != ""; clicked => { root.speak(root.selected-headword, "en"); } } ClassicButton { text: root.ui-lang == "vi" ? "Dừng" : "Stop"; width: 44px; height: 22px; clicked => { root.stop-tts(); } } ClassicButton { text: root.ui-lang == "vi" ? "Sao chép" : "Copy"; width: root.ui-lang == "vi" ? 64px : 46px; height: 22px; enabled: root.selected-headword != ""; clicked => { root.copy-to-clipboard(root.selected-headword + "\n" + root.selected-definition); } } ClassicButton { text: root.ui-lang == "vi" ? "Lưu" : "Save"; width: 44px; height: 22px; enabled: root.selected-headword != ""; clicked => { root.export-result-html(); } } ClassicButton { text: root.ui-lang == "vi" ? "Tìm FTS" : "Find"; width: root.ui-lang == "vi" ? 58px : 42px; height: 22px; clicked => { root.full-text-search(root.query); } } } }
      Rectangle { vertical-stretch: 1; background: #fffdf0; ScrollView { VerticalLayout { padding: 8px; spacing: 8px;
       if root.selected-headword != "" : Rectangle { background: #fffef8; border-color: #b9d2e7; border-width: 1px; border-radius: 2px;
        VerticalLayout { spacing: 0px;
-        Rectangle { height: 23px; background: #dcebf8; border-top-left-radius: 2px; border-top-right-radius: 2px; border-color: #9fbbd4; border-width: 1px; HorizontalLayout { padding-left: 7px; padding-right: 7px; spacing: 6px; BookIcon { } Text { text: root.selected-dict-badge != "" ? root.selected-dict-badge : "Dictionary"; color: #174d7b; font-family: "Tahoma"; font-size: 11px; font-weight: 700; vertical-alignment: center; overflow: elide; } Rectangle { horizontal-stretch: 1; } Text { text: "⌃"; color: #58758b; font-size: 10px; vertical-alignment: center; } } }
+        Rectangle { height: 23px; background: #dcebf8; border-top-left-radius: 2px; border-top-right-radius: 2px; border-color: #9fbbd4; border-width: 1px; HorizontalLayout { padding-left: 7px; padding-right: 7px; spacing: 6px; BookIcon { } Text { text: root.selected-dict-badge != "" ? root.selected-dict-badge : (root.ui-lang == "vi" ? "Từ điển" : "Dictionary"); color: #174d7b; font-family: "Noto Sans"; font-size: 11px; font-weight: 700; vertical-alignment: center; overflow: elide; } Rectangle { horizontal-stretch: 1; } Text { text: "⌃"; color: #58758b; font-size: 10px; vertical-alignment: center; } } }
         VerticalLayout { padding-left: 18px; padding-right: 14px; padding-top: 10px; padding-bottom: 14px; spacing: 4px;
          for line in root.definition-lines : HorizontalLayout { spacing: 6px;
-          if line.kind == "headword" : Text { text: line.body; font-family: "Tahoma"; font-size: 15px; font-weight: 700; color: #102a43; }
-          if line.kind == "phonetic" : Text { text: line.body; font-family: "Tahoma"; font-size: 12px; color: #2c9a28; }
-          if line.kind == "pos" : HorizontalLayout { spacing: 5px; Text { text: line.prefix; color: #d74e3a; font-size: 9px; vertical-alignment: center; } Text { text: line.body; font-family: "Tahoma"; font-size: 11px; font-italic: true; color: #d74e3a; } }
-          if line.kind == "section" : HorizontalLayout { spacing: 5px; Text { text: line.prefix; color: #3d76a5; font-size: 9px; vertical-alignment: center; } Text { text: line.body; font-family: "Tahoma"; font-size: 11px; font-weight: 700; color: #245f91; } }
-          if line.kind == "sense" : HorizontalLayout { spacing: 5px; if line.prefix != "" : Text { text: line.prefix; font-family: "Tahoma"; font-size: 11px; font-weight: 700; color: #168a82; min-width: 18px; } Text { text: line.body; font-family: "Tahoma"; font-size: 11px; color: #202020; wrap: word-wrap; horizontal-stretch: 1; } }
-          if line.kind == "example" : HorizontalLayout { padding-left: 12px; spacing: 5px; Text { text: line.prefix; font-size: 10px; color: #397fb7; } Text { text: line.body; font-family: "Tahoma"; font-size: 11px; font-italic: true; color: #555555; wrap: word-wrap; horizontal-stretch: 1; } }
-          if line.kind == "bullet" : HorizontalLayout { padding-left: 12px; spacing: 5px; Text { text: line.prefix; font-size: 10px; color: #78909c; } Text { text: line.body; font-family: "Tahoma"; font-size: 11px; color: #455a64; wrap: word-wrap; horizontal-stretch: 1; } }
-          if line.kind != "headword" && line.kind != "phonetic" && line.kind != "pos" && line.kind != "section" && line.kind != "sense" && line.kind != "example" && line.kind != "bullet" : Text { text: line.body; font-family: "Tahoma"; font-size: 11px; color: #263238; wrap: word-wrap; }
+          if line.kind == "headword" : Text { text: line.body; font-family: "Noto Sans"; font-size: 15px; font-weight: 700; color: #102a43; }
+          if line.kind == "phonetic" : Text { text: line.body; font-family: "Noto Sans"; font-size: 12px; color: #2c9a28; }
+          if line.kind == "pos" : HorizontalLayout { spacing: 5px; Text { text: line.prefix; color: #d74e3a; font-size: 9px; vertical-alignment: center; } Text { text: line.body; font-family: "Noto Sans"; font-size: 11px; font-italic: true; color: #d74e3a; } }
+          if line.kind == "section" : HorizontalLayout { spacing: 5px; Text { text: line.prefix; color: #3d76a5; font-size: 9px; vertical-alignment: center; } Text { text: line.body; font-family: "Noto Sans"; font-size: 11px; font-weight: 700; color: #245f91; } }
+          if line.kind == "sense" : HorizontalLayout { spacing: 5px; if line.prefix != "" : Text { text: line.prefix; font-family: "Noto Sans"; font-size: 11px; font-weight: 700; color: #168a82; min-width: 18px; } Text { text: line.body; font-family: "Noto Sans"; font-size: 11px; color: #202020; wrap: word-wrap; horizontal-stretch: 1; } }
+          if line.kind == "example" : HorizontalLayout { padding-left: 12px; spacing: 5px; Text { text: line.prefix; font-size: 10px; color: #397fb7; } Text { text: line.body; font-family: "Noto Sans"; font-size: 11px; font-italic: true; color: #555555; wrap: word-wrap; horizontal-stretch: 1; } }
+          if line.kind == "bullet" : HorizontalLayout { padding-left: 12px; spacing: 5px; Text { text: line.prefix; font-size: 10px; color: #78909c; } Text { text: line.body; font-family: "Noto Sans"; font-size: 11px; color: #455a64; wrap: word-wrap; horizontal-stretch: 1; } }
+          if line.kind != "headword" && line.kind != "phonetic" && line.kind != "pos" && line.kind != "section" && line.kind != "sense" && line.kind != "example" && line.kind != "bullet" : Text { text: line.body; font-family: "Noto Sans"; font-size: 11px; color: #263238; wrap: word-wrap; }
          }
-         if root.definition-lines.length == 0 : Text { text: root.selected-definition; font-family: "Tahoma"; font-size: 11px; color: #172f43; wrap: word-wrap; }
+         if root.definition-lines.length == 0 : Text { text: root.selected-definition; font-family: "Noto Sans"; font-size: 11px; color: #172f43; wrap: word-wrap; }
         }
        }
       }
-      if root.selected-headword == "" : Rectangle { background: #fffef8; border-color: #b9d2e7; border-width: 1px; border-radius: 2px; VerticalLayout { padding: 18px; spacing: 10px; Text { text: "Welcome to Lingoes RS"; font-family: "Tahoma"; font-size: 15px; font-weight: 700; color: #174d7b; } Text { text: "Enter a word or phrase in the search box above, then press Enter or click Search.\n\nUse Results or History on the left, and manage additional StarDict dictionaries from the Dictionaries tab."; font-family: "Tahoma"; font-size: 11px; color: #45637d; wrap: word-wrap; } } }
+      if root.selected-headword == "" : Rectangle { background: #fffef8; border-color: #b9d2e7; border-width: 1px; border-radius: 2px; VerticalLayout { padding: 18px; spacing: 10px; Text { text: root.ui-lang == "vi" ? "Chào mừng đến với Lingoes RS" : "Welcome to Lingoes RS"; font-family: "Noto Sans"; font-size: 15px; font-weight: 700; color: #174d7b; } Text { text: root.ui-lang == "vi" ? "Nhập từ hoặc cụm từ vào ô tìm kiếm ở trên, sau đó nhấn Enter hoặc bấm Tra từ (▶).\n\nSử dụng danh sách Kết quả hoặc Lịch sử bên trái, và quản lý các bộ từ điển bổ sung tại thẻ Quản lý từ điển." : "Enter a word or phrase in the search box above, then press Enter or click Search (▶).\n\nUse Results or History on the left, and manage additional StarDict dictionaries from the Dictionaries tab."; font-family: "Noto Sans"; font-size: 11px; color: #45637d; wrap: word-wrap; } } }
       Rectangle { vertical-stretch: 1; background: transparent; }
      } } }
     } }
    }
-   if root.active-tab == 1 : VerticalLayout { padding: 6px; spacing: 5px; SectionTitle { text: "Text Translation"; } HorizontalLayout { height: 27px; spacing: 5px; Text { text: "From:"; width: 35px; color: #174d7b; } LineEdit { width: 75px; text <=> root.translate-from-lang; } Text { text: "To:"; width: 20px; } LineEdit { width: 75px; text <=> root.translate-to-lang; } Text { text: "Engine:"; width: 45px; } LineEdit { width: 110px; text <=> root.translate-engine; } Rectangle { horizontal-stretch: 1; } ClassicButton { text: root.is-translating ? "Cancel" : "Translate"; width: 78px; clicked => { if root.is-translating { root.cancel-translation(); } else { root.translate(root.translate-source-text, root.translate-from-lang, root.translate-to-lang, root.translate-engine); } } } } HorizontalLayout { spacing: 5px; vertical-stretch: 1; Rectangle { horizontal-stretch: 1; border-color: #91aec3; border-width: 1px; VerticalLayout { spacing: 0px; SectionTitle { text: "Source Text"; } TextEdit { text <=> root.translate-source-text; vertical-stretch: 1; } } } Rectangle { horizontal-stretch: 1; border-color: #91aec3; border-width: 1px; VerticalLayout { spacing: 0px; HorizontalLayout { height: 27px; Text { text: "Translation"; color: #174d7b; font-weight: 700; } Rectangle { horizontal-stretch: 1; } ClassicButton { text: "Speak"; clicked => { root.speak(root.translate-target-text, root.translate-to-lang); } } ClassicButton { text: "Stop"; clicked => { root.stop-tts(); } } ClassicButton { text: "Copy"; clicked => { root.copy-to-clipboard(root.translate-target-text); } } } TextEdit { text <=> root.translate-target-text; vertical-stretch: 1; } } } } }
-   if root.active-tab == 2 : VerticalLayout { padding: 6px; spacing: 5px; SectionTitle { text: "Dictionary Management"; } Rectangle { height: 65px; background: #eef5fa; border-color: #9eb7c9; border-width: 1px; VerticalLayout { padding: 5px; Text { text: "Install a StarDict (.ifo), MDict (.mdx), or TSV dictionary"; color: #174d7b; } HorizontalLayout { spacing: 5px; LineEdit { text <=> root.import-path; placeholder-text: "Dictionary file path"; horizontal-stretch: 2; } LineEdit { text <=> root.import-name; placeholder-text: "Display name"; } ClassicButton { text: "Import"; clicked => { root.import-dictionary(root.import-path, root.import-name); } } } } } Rectangle { vertical-stretch: 1; border-color: #91aec3; border-width: 1px; VerticalLayout { spacing: 0px; SectionTitle { text: "Installed Dictionaries"; } ListView { for dict in root.dictionaries : Rectangle { height: 43px; border-color: #d5e0e8; border-width: 1px; HorizontalLayout { padding: 6px; spacing: 6px; VerticalLayout { horizontal-stretch: 1; Text { text: dict.name; color: #173f61; font-weight: 700; } Text { text: dict.format + " | " + dict.entry-count + " entries | " + (dict.enabled ? "Enabled" : "Disabled"); color: #58758b; font-size: 10px; } } ClassicButton { text: dict.enabled ? "Disable" : "Enable"; clicked => { root.toggle-dictionary(dict.id, !dict.enabled); } } ClassicButton { text: "Delete"; clicked => { root.delete-dictionary(dict.id); } } } } } } } }
-   if root.active-tab == 3 : ScrollView { VerticalLayout { padding: 6px; spacing: 5px; SectionTitle { text: "Settings and Capture"; } Rectangle { height: 182px; background: #f4f9fd; border-color: #9eb7c9; border-width: 1px; VerticalLayout { padding: 7px; spacing: 5px; Text { text: "Automatic Capture"; color: #174d7b; font-weight: 700; } CheckBox { text: "Look up text copied to the clipboard"; checked <=> root.clipboard-monitor-enabled; toggled => { root.toggle-clipboard-monitor(self.checked); } } CheckBox { text: "Capture words under the pointer using UI Automation"; checked <=> root.cursor-capture-enabled; toggled => { root.configure-capture(self.checked, root.selection-capture-enabled, root.ocr-fallback-enabled); } } CheckBox { text: "Capture selected or double-clicked text"; checked <=> root.selection-capture-enabled; toggled => { root.configure-capture(root.cursor-capture-enabled, self.checked, root.ocr-fallback-enabled); } } CheckBox { text: "Allow OCR fallback"; checked <=> root.ocr-fallback-enabled; toggled => { root.configure-capture(root.cursor-capture-enabled, root.selection-capture-enabled, self.checked); } } CheckBox { text: "Pronounce automatically after quick lookup"; checked <=> root.auto-pronounce-enabled; toggled => { root.toggle-auto-pronounce(self.checked); } } } } Rectangle { height: 176px; background: #f4f9fd; border-color: #9eb7c9; border-width: 1px; VerticalLayout { padding: 7px; spacing: 6px; Text { text: "Online Translation and AI"; color: #174d7b; font-weight: 700; } HorizontalLayout { Text { text: "Base URL:"; width: 145px; } LineEdit { text <=> root.openai-base-url; } } HorizontalLayout { Text { text: "Model:"; width: 145px; } LineEdit { text <=> root.openai-model; } } HorizontalLayout { Text { text: "API key:"; width: 145px; } LineEdit { text <=> root.openai-api-key; } } HorizontalLayout { Text { text: "Default target language:"; width: 145px; } LineEdit { text <=> root.default-target-lang; } } } } } }
-  }
-  Rectangle { height: 22px; background: root.status-is-error ? #f8e5e5 : #e1edf5; border-color: root.status-is-error ? #c99191 : #91aec3; border-width: 1px; HorizontalLayout { padding-left: 6px; padding-right: 6px; Text { text: root.status-text; color: root.status-is-error ? #9a2525 : #174d7b; font-family: "Tahoma"; font-size: 11px; vertical-alignment: center; overflow: elide; } Rectangle { horizontal-stretch: 1; } Text { text: root.private-mode ? "Private" : "Ready"; color: #58758b; font-size: 10px; vertical-alignment: center; } } }
+   if root.active-tab == 1 : VerticalLayout { padding: 6px; spacing: 5px; SectionTitle { text: root.ui-lang == "vi" ? "Dịch văn bản trực tuyến" : "Text Translation"; } HorizontalLayout { height: 27px; spacing: 5px; Text { text: root.ui-lang == "vi" ? "Từ:" : "From:"; width: 35px; color: #174d7b; } LineEdit { width: 75px; text <=> root.translate-from-lang; } Text { text: root.ui-lang == "vi" ? "Đến:" : "To:"; width: 35px; } LineEdit { width: 75px; text <=> root.translate-to-lang; } Text { text: root.ui-lang == "vi" ? "Bộ dịch:" : "Engine:"; width: 55px; } LineEdit { width: 110px; text <=> root.translate-engine; } Rectangle { horizontal-stretch: 1; } ClassicButton { text: root.is-translating ? (root.ui-lang == "vi" ? "Hủy" : "Cancel") : (root.ui-lang == "vi" ? "Dịch ngay" : "Translate"); width: 86px; clicked => { if root.is-translating { root.cancel-translation(); } else { root.translate(root.translate-source-text, root.translate-from-lang, root.translate-to-lang, root.translate-engine); } } } } HorizontalLayout { spacing: 5px; vertical-stretch: 1; Rectangle { horizontal-stretch: 1; border-color: #91aec3; border-width: 1px; VerticalLayout { spacing: 0px; SectionTitle { text: root.ui-lang == "vi" ? "Văn bản gốc" : "Source Text"; } TextEdit { text <=> root.translate-source-text; vertical-stretch: 1; } } } Rectangle { horizontal-stretch: 1; border-color: #91aec3; border-width: 1px; VerticalLayout { spacing: 0px; HorizontalLayout { height: 27px; Text { text: root.ui-lang == "vi" ? "Bản dịch" : "Translation"; color: #174d7b; font-weight: 700; } Rectangle { horizontal-stretch: 1; } ClassicButton { text: root.ui-lang == "vi" ? "Phát âm" : "Speak"; clicked => { root.speak(root.translate-target-text, root.translate-to-lang); } } ClassicButton { text: root.ui-lang == "vi" ? "Dừng" : "Stop"; clicked => { root.stop-tts(); } } ClassicButton { text: root.ui-lang == "vi" ? "Sao chép" : "Copy"; clicked => { root.copy-to-clipboard(root.translate-target-text); } } } TextEdit { text <=> root.translate-target-text; vertical-stretch: 1; } } } } }
+   if root.active-tab == 2 : VerticalLayout { padding: 6px; spacing: 5px; SectionTitle { text: root.ui-lang == "vi" ? "Quản lý từ điển" : "Dictionary Management"; } Rectangle { height: 65px; background: #eef5fa; border-color: #9eb7c9; border-width: 1px; VerticalLayout { padding: 5px; Text { text: root.ui-lang == "vi" ? "Cài đặt từ điển StarDict (.ifo), MDict (.mdx), hoặc TSV" : "Install a StarDict (.ifo), MDict (.mdx), or TSV dictionary"; color: #174d7b; } HorizontalLayout { spacing: 5px; LineEdit { text <=> root.import-path; placeholder-text: root.ui-lang == "vi" ? "Đường dẫn file từ điển" : "Dictionary file path"; horizontal-stretch: 2; } LineEdit { text <=> root.import-name; placeholder-text: root.ui-lang == "vi" ? "Tên hiển thị (tùy chọn)" : "Display name"; } ClassicButton { text: root.ui-lang == "vi" ? "Nhập từ điển" : "Import"; clicked => { root.import-dictionary(root.import-path, root.import-name); } } } } } Rectangle { vertical-stretch: 1; border-color: #91aec3; border-width: 1px; VerticalLayout { spacing: 0px; SectionTitle { text: root.ui-lang == "vi" ? "Danh sách từ điển đã cài" : "Installed Dictionaries"; } ListView { for dict in root.dictionaries : Rectangle { height: 43px; border-color: #d5e0e8; border-width: 1px; HorizontalLayout { padding: 6px; spacing: 6px; VerticalLayout { horizontal-stretch: 1; Text { text: dict.name; color: #173f61; font-weight: 700; } Text { text: dict.format + " | " + dict.entry-count + (root.ui-lang == "vi" ? " mục từ | " : " entries | ") + (dict.enabled ? (root.ui-lang == "vi" ? "Đang bật" : "Enabled") : (root.ui-lang == "vi" ? "Đã tắt" : "Disabled")); color: #58758b; font-size: 10px; } } ClassicButton { text: dict.enabled ? (root.ui-lang == "vi" ? "Tắt" : "Disable") : (root.ui-lang == "vi" ? "Bật" : "Enable"); clicked => { root.toggle-dictionary(dict.id, !dict.enabled); } } ClassicButton { text: root.ui-lang == "vi" ? "Xóa" : "Delete"; clicked => { root.delete-dictionary(dict.id); } } } } } } } }
+   if root.active-tab == 3 : ScrollView { VerticalLayout { padding: 6px; spacing: 5px; SectionTitle { text: root.ui-lang == "vi" ? "Cài đặt & Ngôn ngữ giao diện" : "Settings & Language"; } Rectangle { height: 68px; background: #f4f9fd; border-color: #9eb7c9; border-width: 1px; VerticalLayout { padding: 7px; spacing: 6px; Text { text: root.ui-lang == "vi" ? "Ngôn ngữ giao diện (Interface Language)" : "Interface Language (Ngôn ngữ giao diện)"; color: #174d7b; font-weight: 700; } HorizontalLayout { spacing: 8px; ClassicButton { text: "🇻🇳 Tiếng Việt"; width: 110px; height: 24px; selected: root.ui-lang == "vi"; clicked => { root.ui-lang = "vi"; root.change-language("vi"); } } ClassicButton { text: "🇬🇧 English"; width: 100px; height: 24px; selected: root.ui-lang == "en"; clicked => { root.ui-lang = "en"; root.change-language("en"); } } } } } Rectangle { height: 182px; background: #f4f9fd; border-color: #9eb7c9; border-width: 1px; VerticalLayout { padding: 7px; spacing: 5px; Text { text: root.ui-lang == "vi" ? "Tự động bắt chữ" : "Automatic Capture"; color: #174d7b; font-weight: 700; } CheckBox { text: root.ui-lang == "vi" ? "Tra cứu tự động khi sao chép vào clipboard" : "Look up text copied to the clipboard"; checked <=> root.clipboard-monitor-enabled; toggled => { root.toggle-clipboard-monitor(self.checked); } } CheckBox { text: root.ui-lang == "vi" ? "Bắt chữ dưới con trỏ chuột bằng UI Automation" : "Capture words under the pointer using UI Automation"; checked <=> root.cursor-capture-enabled; toggled => { root.configure-capture(self.checked, root.selection-capture-enabled, root.ocr-fallback-enabled); } } CheckBox { text: root.ui-lang == "vi" ? "Bắt chữ khi bôi đen hoặc nháy đúp chuột" : "Capture selected or double-clicked text"; checked <=> root.selection-capture-enabled; toggled => { root.configure-capture(root.cursor-capture-enabled, self.checked, root.ocr-fallback-enabled); } } CheckBox { text: root.ui-lang == "vi" ? "Cho phép nhận dạng ký tự quang học (OCR fallback)" : "Allow OCR fallback"; checked <=> root.ocr-fallback-enabled; toggled => { root.configure-capture(root.cursor-capture-enabled, root.selection-capture-enabled, self.checked); } } CheckBox { text: root.ui-lang == "vi" ? "Tự động phát âm sau khi tra nhanh" : "Pronounce automatically after quick lookup"; checked <=> root.auto-pronounce-enabled; toggled => { root.toggle-auto-pronounce(self.checked); } } } } Rectangle { height: 176px; background: #f4f9fd; border-color: #9eb7c9; border-width: 1px; VerticalLayout { padding: 7px; spacing: 6px; Text { text: root.ui-lang == "vi" ? "Dịch trực tuyến & AI" : "Online Translation and AI"; color: #174d7b; font-weight: 700; } HorizontalLayout { Text { text: root.ui-lang == "vi" ? "Địa chỉ API (Base URL):" : "Base URL:"; width: 145px; } LineEdit { text <=> root.openai-base-url; } } HorizontalLayout { Text { text: root.ui-lang == "vi" ? "Mô hình (Model):" : "Model:"; width: 145px; } LineEdit { text <=> root.openai-model; } } HorizontalLayout { Text { text: root.ui-lang == "vi" ? "Khóa API (API key):" : "API key:"; width: 145px; } LineEdit { text <=> root.openai-api-key; } } HorizontalLayout { Text { text: root.ui-lang == "vi" ? "Ngôn ngữ đích mặc định:" : "Default target language:"; width: 145px; } LineEdit { text <=> root.default-target-lang; } } } } } }
+   }
+   Rectangle { height: 22px; background: root.status-is-error ? #f8e5e5 : #e1edf5; border-color: root.status-is-error ? #c99191 : #91aec3; border-width: 1px; HorizontalLayout { padding-left: 6px; padding-right: 6px; Text { text: root.status-text; color: root.status-is-error ? #9a2525 : #174d7b; font-family: "Noto Sans"; font-size: 11px; vertical-alignment: center; overflow: elide; } Rectangle { horizontal-stretch: 1; } Text { text: root.private-mode ? (root.ui-lang == "vi" ? "Riêng tư" : "Private") : (root.ui-lang == "vi" ? "Sẵn sàng" : "Ready"); color: #58758b; font-size: 10px; vertical-alignment: center; } } }
  }
 }

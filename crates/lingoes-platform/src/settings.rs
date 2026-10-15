@@ -138,11 +138,22 @@ impl Default for MiniWindowSettings {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ShellSettings {
     pub start_minimized: bool,
     pub close_to_tray: bool,
+    pub language: String,
+}
+
+impl Default for ShellSettings {
+    fn default() -> Self {
+        Self {
+            start_minimized: false,
+            close_to_tray: false,
+            language: "vi".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
