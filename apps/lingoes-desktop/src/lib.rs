@@ -783,19 +783,74 @@ pub fn launch_gui_with_options(
     initial_query: Option<&str>,
     show_popup_word: Option<&str>,
 ) -> Result<(), AppError> {
+    log_startup("launch_gui_with_options started");
     let executable = std::env::current_exe()
         .map_err(|error| AppError(format!("cannot locate executable: {error}")))?;
+    log_startup(&format!("executable: {}", executable.display()));
+
     let data_root = resolve_app_data_root(&executable)?;
+    log_startup(&format!(
+        "data root: {:?} at {}",
+        data_root.mode,
+        data_root.path.display()
+    ));
+
     let settings_store = SettingsStore::new(data_root.settings_path());
     let settings = settings_store
         .load()
         .map_err(|error| AppError(format!("cannot load settings: {error}")))?;
+
     let database_path = resolve_database_path(&data_root);
-    let mut desktop_app = DesktopApp::open(database_path)?;
+    log_startup(&format!("database path: {}", database_path.display()));
+    if !database_path.exists() {
+        let err_msg = format!(
+            "Không tìm thấy tệp cơ sở dữ liệu từ điển 'lexiforge.db' tại:\n{}\n\nNguyên nhân phổ biến:\n1. Bạn đang mở trực tiếp file .exe bên trong file ZIP mà chưa GIẢI NÉN (Extract All).\n   -> Hướng dẫn: Nhấp chuột phải vào file ZIP, chọn 'Extract All...' (Giải nén tất cả), sau đó mở thư mục đã giải nén rồi mới chạy lingoes-desktop.exe.\n2. Thư mục 'data' hoặc tệp 'lexiforge.db' bị thiếu hoặc bị di chuyển.",
+            database_path.display()
+        );
+        show_fatal_error("Lingoes RS - Thiếu tệp dữ liệu", &err_msg);
+        return Err(AppError(err_msg));
+    }
+
+    log_startup("opening dictionary database...");
+    let mut desktop_app = DesktopApp::open(&database_path)?;
     desktop_app.set_settings(settings);
     let application = Arc::new(Mutex::new(desktop_app));
-    let window = AppWindow::new().map_err(|error| AppError(error.to_string()))?;
-    let popup_window = PopupWindow::new().map_err(|error| AppError(error.to_string()))?;
+
+    log_startup("initializing main window...");
+    let window = match AppWindow::new() {
+        Ok(w) => {
+            log_startup("AppWindow initialized successfully");
+            w
+        }
+        Err(err) => {
+            log_startup(&format!(
+                "Hardware renderer failed ({err}), falling back to software renderer..."
+            ));
+            unsafe {
+                std::env::set_var("SLINT_BACKEND", "winit-software");
+            }
+            AppWindow::new().map_err(|err2| {
+                AppError(format!(
+                    "Không thể khởi tạo giao diện đồ họa (Hardware: {err}, Software fallback: {err2})"
+                ))
+            })?
+        }
+    };
+
+    log_startup("initializing popup window...");
+    let popup_window = match PopupWindow::new() {
+        Ok(p) => p,
+        Err(err) => {
+            log_startup(&format!(
+                "PopupWindow hardware init failed ({err}), falling back to software..."
+            ));
+            unsafe {
+                std::env::set_var("SLINT_BACKEND", "winit-software");
+            }
+            PopupWindow::new()
+                .map_err(|err2| AppError(format!("Không thể khởi tạo cửa sổ popup: {err2}")))?
+        }
+    };
     #[cfg(windows)]
     let _popup_native = match materialize_windows_popup(&popup_window) {
         Ok(native) => Some(native),
@@ -2132,8 +2187,29 @@ pub fn run_with_services(
     }
 }
 
+pub fn log_startup(message: &str) {
+    use std::io::Write;
+    eprintln!("[Lingoes] {message}");
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let log_file = dir.join("lingoes_startup.log");
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&log_file)
+            {
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                let _ = writeln!(f, "[+{timestamp}s] {message}");
+            }
+        }
+    }
+}
+
 pub fn show_fatal_error(title: &str, message: &str) {
-    eprintln!("{title}: {message}");
+    log_startup(&format!("FATAL ERROR - {title}: {message}"));
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let log_file = dir.join("lingoes_crash.log");
