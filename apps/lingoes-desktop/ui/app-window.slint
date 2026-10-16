@@ -1333,7 +1333,11 @@ export component AppWindow inherits Window {
                         VerticalLayout {
                             spacing: 0px;
                             SectionTitle { text: root.ui-lang == "vi" ? "Văn bản gốc" : "Source Text"; }
-                            TextEdit { text <=> root.translate-source-text; vertical-stretch: 1; }
+                            TextEdit {
+                                text <=> root.translate-source-text;
+                                wrap: word-wrap;
+                                vertical-stretch: 1;
+                            }
                         }
                     }
                     Rectangle {
@@ -1374,7 +1378,12 @@ export component AppWindow inherits Window {
                                     }
                                 }
                             }
-                            TextEdit { text <=> root.translate-target-text; vertical-stretch: 1; }
+                            TextEdit {
+                                text <=> root.translate-target-text;
+                                wrap: word-wrap;
+                                read-only: true;
+                                vertical-stretch: 1;
+                            }
                         }
                     }
                 }

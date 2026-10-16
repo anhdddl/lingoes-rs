@@ -7,20 +7,49 @@ A clean-room, Rust-only dictionary, translation, text capture, and text-to-speec
 ## Latest UI Gallery
 
 ### Main dictionary window & Start Page
+Classic Lingoes 2.9.2 Win32 Aero layout with quick-action shortcuts, dynamic status bar displaying active entries (`403.887 mục từ | UTF-8`), and navigation rail.
 
 ![Lingoes RS main dictionary window](docs/screenshots/lingoes-rs-main.png)
 
-### Appendices & Reference Utilities (359 Irregular Verbs, Unit Converter, IPA, Dialing Codes)
+### Detailed bilingual dictionary result with Action Bar
+Rich definitions with phonetic IPA, part-of-speech tags, structured senses, examples, and one-click Word Notebook star toggle (`act_star.png`).
 
-![Lingoes RS Appendices](docs/screenshots/lingoes-rs-appendices.png)
+![Lingoes RS dictionary detail](docs/screenshots/lingoes-rs-definition.png)
 
-### Word Notebook (Favorites, Star tagging, HTML Export)
+### Word Notebook (Sổ tay từ vựng)
+Personal vocabulary notebook with one-click star tagging, quick delete (`×`), and full HTML export (`Ctrl+S` / `Export HTML`).
 
 ![Lingoes RS Word Notebook](docs/screenshots/lingoes-rs-notebook.png)
 
-### Detailed bilingual dictionary result with Action Bar
+### Appendices — 359 English Irregular Verbs
+Searchable 359 irregular verb table with past tense, past participle, -ing forms, Vietnamese definitions, and instant Click-to-Lookup.
 
-![Lingoes RS dictionary detail](docs/screenshots/lingoes-rs-definition.png)
+![Lingoes RS Irregular Verbs](docs/screenshots/lingoes-rs-appendices-verbs.png)
+
+### Appendices — 2-Way Interactive Unit Converter
+Real-time bi-directional conversion across Length, Weight, Temperature, and Volume metrics with live calculation tables.
+
+![Lingoes RS Unit Converter](docs/screenshots/lingoes-rs-appendices-units.png)
+
+### Appendices — International Phonetic Alphabet (IPA) Chart
+Comprehensive 44-phoneme IPA chart categorized into monophthongs, diphthongs, and consonants with word examples and listen actions.
+
+![Lingoes RS IPA Chart](docs/screenshots/lingoes-rs-appendices-ipa.png)
+
+### Appendices — International Dialing Codes
+Complete 43+ country international calling code directory with ISO badges, country names, prefix codes, and one-click clipboard copy.
+
+![Lingoes RS Dialing Codes](docs/screenshots/lingoes-rs-appendices-dialing.png)
+
+### Online Text Translation
+Multi-line dual-pane translation engine supporting Google Translate and OpenAI/Local LLMs with automatic word-wrap and text-to-speech audio.
+
+![Lingoes RS Translation](docs/screenshots/lingoes-rs-translation.png)
+
+### Classic Win32 Dropdown Menus
+Pixel-perfect classic Win32 hierarchical menu bar with keyboard accelerators (`Ctrl+N`, `Ctrl+W`, `Ctrl+A`, `Ctrl+T`, `Ctrl+D`, `Ctrl+S`, `Alt+F4`).
+
+![Lingoes RS Classic Menu](docs/screenshots/lingoes-rs-file-menu.png)
 
 ## Principles
 
