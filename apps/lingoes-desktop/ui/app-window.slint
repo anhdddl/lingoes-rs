@@ -406,6 +406,7 @@ export component AppWindow inherits Window {
     callback select-result(int);
     callback navigate-back();
     callback navigate-forward();
+    callback go-home();
     callback speak(string, string);
     callback stop-tts();
     callback copy-to-clipboard(string);
@@ -576,6 +577,16 @@ export component AppWindow inherits Window {
                     enabled: root.can-go-forward;
                     clicked => { root.navigate-forward(); }
                 }
+                CircleNavButton {
+                    has-icon: true;
+                    icon: @image-url("assets/nav_home.png");
+                    enabled: true;
+                    clicked => {
+                        root.active-tab = 0;
+                        root.query = "";
+                        root.go-home();
+                    }
+                }
                 // Spacious Search Input
                 Rectangle {
                     horizontal-stretch: 1;
@@ -590,9 +601,9 @@ export component AppWindow inherits Window {
                         padding-left: 6px;
                         padding-right: 2px;
                         spacing: 4px;
-                        alignment: center;
                         BookIcon { }
                         LineEdit {
+                            horizontal-stretch: 1;
                             text <=> root.query;
                             placeholder-text: root.ui-lang == "vi" ? "Nhập từ cần tra (có dấu hoặc không dấu)..." : "Type a word to look up...";
                             edited(value) => { root.live-search(value); }
@@ -1039,6 +1050,18 @@ export component AppWindow inherits Window {
                                     height: 16px;
                                     background: #b0c9df;
                                     y: 7px;
+                                }
+                                ClassicButton {
+                                    y: 3px;
+                                    has-icon: true;
+                                    icon: @image-url("assets/nav_home.png");
+                                    text: root.ui-lang == "vi" ? "Trang chính" : "Home";
+                                    enabled: root.selected-headword != "";
+                                    clicked => {
+                                        root.active-tab = 0;
+                                        root.query = "";
+                                        root.go-home();
+                                    }
                                 }
                                 ClassicButton {
                                     y: 3px;
@@ -2091,6 +2114,17 @@ export component AppWindow inherits Window {
         VerticalLayout {
             padding: 3px;
             spacing: 1px;
+            MenuDropdownItem {
+                text: root.ui-lang == "vi" ? "Trang chính" : "Start Page";
+                icon-text: "🏠";
+                shortcut: "Alt+Home";
+                clicked => {
+                    root.active-tab = 0;
+                    root.query = "";
+                    root.active-menu = 0;
+                    root.go-home();
+                }
+            }
             MenuDropdownItem {
                 text: root.ui-lang == "vi" ? "Tra từ mới" : "New Search";
                 icon-text: "🔍";

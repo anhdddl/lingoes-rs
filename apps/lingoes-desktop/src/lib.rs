@@ -221,6 +221,18 @@ impl DesktopApp {
         self.search_with_mode(query, true);
     }
 
+    pub fn go_home(&mut self) {
+        self.results.clear();
+        self.selected_index = None;
+        self.last_live_query.clear();
+        self.status = if self.language() == "en" {
+            "Enter a word or phrase to look up".into()
+        } else {
+            "Nhập từ khóa để tra cứu".into()
+        };
+        self.has_error = false;
+    }
+
     fn search_with_mode(&mut self, query: &str, advanced: bool) {
         let Ok(lookup_query) = LookupQuery::new(query) else {
             self.results.clear();
@@ -1061,6 +1073,22 @@ pub fn launch_gui_with_options(
                 }
             }
             if let Some(window) = window_weak.upgrade() {
+                update_window(&window, &app);
+            }
+        });
+    }
+    {
+        let application = Arc::clone(&application);
+        let window_weak = window.as_weak();
+        window.on_go_home(move || {
+            let mut app = application.lock().unwrap();
+            app.go_home();
+            if let Some(window) = window_weak.upgrade() {
+                window.set_active_tab(0);
+                window.set_query("".into());
+                window.set_selected_headword("".into());
+                window.set_selected_definition("".into());
+                window.set_selected_index(-1);
                 update_window(&window, &app);
             }
         });
@@ -2325,6 +2353,29 @@ mod tests {
         assert!(application.live_search(""));
         assert!(application.results().is_empty());
         assert!(!application.live_search("   "));
+
+        let _ = std::fs::remove_file(database_path);
+        let _ = std::fs::remove_file(source_path);
+    }
+
+    #[test]
+    fn go_home_resets_results_selection_and_status() {
+        let database_path = temporary_path("home-test", "db");
+        let source_path = temporary_path("home-test", "tsv");
+        std::fs::write(&source_path, "rust\tA systems language\n").unwrap();
+        let mut application = DesktopApp::open(&database_path).unwrap();
+        application.import_path(&source_path).unwrap();
+
+        application.search("rust");
+        assert_eq!(application.selected_headword(), "rust");
+        assert_eq!(application.results().len(), 1);
+
+        application.go_home();
+        assert_eq!(application.selected_headword(), "");
+        assert_eq!(application.results().len(), 0);
+        assert_eq!(application.selected_index(), None);
+        assert_eq!(application.status(), "Nhập từ khóa để tra cứu");
+        assert!(!application.has_error());
 
         let _ = std::fs::remove_file(database_path);
         let _ = std::fs::remove_file(source_path);
