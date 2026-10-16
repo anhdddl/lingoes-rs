@@ -205,3 +205,24 @@ cargo build --workspace
 ```bash
 xvfb-run target/debug/lingoes-desktop
 ```
+
+---
+
+## Windows 11 / 10 Standalone Portable & Self-Diagnosis
+
+Lingoes RS compiles to a completely standalone native Windows x64 binary (`lingoes-desktop.exe`):
+- **Zero External Runtime Dependencies**: Statically linked CRT (`+crt-static`), zero Microsoft Visual C++ Redistributable requirements.
+- **Embedded Win32 Resources**: Native multi-resolution Aero parrot icon (`lingoes.ico`) and Windows 11 Application Manifest (`PerMonitorV2` High-DPI scaling, ComCtl32 v6.0, UTF-8 Code Page, LongPathAware).
+- **Self-Diagnosis & Startup Recovery**:
+  - Automatically captures parent console (`AttachConsole`) when run from CMD or PowerShell.
+  - Automatically writes detailed startup diagnostic logs to `lingoes_startup.log`.
+  - Prompts with native Win32 `MessageBoxW` if run unextracted from inside a ZIP archive without `data/lexiforge.db`.
+  - Built-in software-renderer fallback (`--software` flag or `SLINT_BACKEND=winit-software`) for machines without dedicated GPU/OpenGL drivers.
+
+### Cross-compiling for Windows x64
+
+```bash
+# Cross-compile standalone MSVC release with static CRT
+RUSTFLAGS="-C target-feature=+crt-static" cargo xwin build --release --target x86_64-pc-windows-msvc -p lingoes-desktop
+```
+
